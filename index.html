@@ -1,0 +1,432 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="아이가 칭찬 도장을 모으는 인터랙티브 리워드 판">
+<title>칭찬 도장 판</title>
+<style>
+  :root {
+    --bg: #0B0E17;
+    --panel: #141A28;
+    --panel-2: #1B2333;
+    --line: #29334A;
+    --ink: #EAF0FF;
+    --ink-soft: #8B96AE;
+    --cyan: #38E1FF;
+    --violet: #7C6CFF;
+    --gold: #FFD264;
+    --gold-deep: #E0A93B;
+    --slot: #10151F;
+  }
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    color: var(--ink);
+    font-family: "Apple SD Gothic Neo", "Pretendard", "Malgun Gothic", system-ui,
+      -apple-system, "Segoe UI", Roboto, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    min-height: 100vh;
+    padding: 40px 18px 64px;
+    background:
+      radial-gradient(circle at 15% 0%, rgba(124,108,255,.20), transparent 45%),
+      radial-gradient(circle at 90% 100%, rgba(56,225,255,.16), transparent 45%),
+      var(--bg);
+    background-attachment: fixed;
+    position: relative;
+  }
+  body::before {
+    content: ""; position: fixed; inset: 0; pointer-events: none; z-index: 0;
+    background-image:
+      linear-gradient(rgba(120,140,190,.045) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(120,140,190,.045) 1px, transparent 1px);
+    background-size: 42px 42px;
+    mask-image: radial-gradient(circle at 50% 40%, #000 40%, transparent 90%);
+  }
+
+  .board {
+    max-width: 780px; margin: 0 auto; position: relative; z-index: 1;
+    background: linear-gradient(180deg, rgba(27,35,51,.9), rgba(20,26,40,.94));
+    border: 1px solid var(--line);
+    border-radius: 24px;
+    padding: 40px 38px 34px;
+    box-shadow:
+      0 40px 80px rgba(0,0,0,.5),
+      inset 0 1px 0 rgba(255,255,255,.05);
+    backdrop-filter: blur(6px);
+  }
+
+  /* ---- header ---- */
+  header { text-align: center; }
+  .eyebrow {
+    display: inline-flex; align-items: center; gap: 8px;
+    font-size: 12px; font-weight: 800; letter-spacing: .32em;
+    color: var(--cyan); text-transform: uppercase; margin-bottom: 14px;
+    padding: 6px 14px; border: 1px solid rgba(56,225,255,.35); border-radius: 100px;
+    background: rgba(56,225,255,.06);
+  }
+  .eyebrow::before { content: "◆"; font-size: 9px; letter-spacing: 0; }
+  .title {
+    font-size: clamp(32px, 6.4vw, 52px);
+    font-weight: 900; line-height: 1.02; letter-spacing: -.03em;
+    text-wrap: balance; margin: 0;
+    background: linear-gradient(180deg, #fff, #B9C4DE);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+  }
+  .name-row { margin-top: 14px; font-size: 16px; font-weight: 600; color: var(--ink-soft); }
+  [contenteditable] { outline: none; border-radius: 6px; }
+  [contenteditable]:focus { box-shadow: 0 0 0 2px var(--cyan); background: rgba(56,225,255,.08); }
+  .edit-name {
+    color: var(--cyan); font-weight: 800;
+    border-bottom: 1px dashed rgba(56,225,255,.5); padding: 0 4px; display: inline-block; min-width: 40px;
+  }
+  .title[contenteditable]:focus { -webkit-text-fill-color: var(--ink); }
+
+  /* ---- reward strip ---- */
+  .reward {
+    margin: 24px auto 4px; max-width: 540px;
+    display: flex; align-items: center; gap: 14px; justify-content: center;
+    background: linear-gradient(90deg, rgba(255,210,100,.08), rgba(124,108,255,.06));
+    border: 1px solid rgba(255,210,100,.28);
+    border-radius: 16px; padding: 14px 20px;
+  }
+  .reward .gift { font-size: 26px; line-height: 1; filter: drop-shadow(0 0 10px rgba(255,210,100,.5)); }
+  .reward .lbl { font-size: 11px; font-weight: 800; letter-spacing: .22em; color: var(--gold); text-transform: uppercase; }
+  .reward .txt { font-size: 17px; font-weight: 800; color: var(--ink); }
+
+  /* ---- toolbar ---- */
+  .toolbar {
+    margin: 26px 0 8px; display: flex; flex-wrap: wrap; gap: 18px;
+    align-items: center; justify-content: space-between;
+  }
+  .group { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .group .cap { font-size: 11px; font-weight: 800; color: var(--ink-soft); letter-spacing: .18em; text-transform: uppercase; }
+  .stamp-pick {
+    width: 44px; height: 44px; border: 1px solid var(--line); background: var(--slot);
+    border-radius: 12px; font-size: 22px; cursor: pointer; line-height: 1;
+    display: grid; place-items: center; transition: transform .14s, border-color .14s, box-shadow .14s;
+  }
+  .stamp-pick:hover { transform: translateY(-2px); border-color: var(--cyan); }
+  .stamp-pick.active {
+    border-color: var(--gold);
+    box-shadow: 0 0 0 1px var(--gold), 0 0 16px rgba(255,210,100,.4);
+    transform: translateY(-2px);
+  }
+
+  select {
+    font: inherit; font-weight: 700; color: var(--ink);
+    background: var(--slot); border: 1px solid var(--line);
+    border-radius: 10px; padding: 9px 13px; cursor: pointer;
+  }
+  select:focus-visible { outline: 2px solid var(--cyan); outline-offset: 1px; }
+
+  /* ---- grid ---- */
+  .grid {
+    display: grid; gap: 13px; margin: 24px 0 6px;
+    grid-template-columns: repeat(5, 1fr);
+  }
+  @media (max-width: 520px) { .grid { grid-template-columns: repeat(4, 1fr); gap: 10px; } }
+
+  .cell {
+    aspect-ratio: 1; border-radius: 16px;
+    background: var(--slot);
+    border: 1px solid var(--line);
+    display: grid; place-items: center; position: relative;
+    cursor: pointer; font-size: clamp(26px, 6vw, 40px); line-height: 1;
+    transition: transform .14s, box-shadow .14s, border-color .14s, background .2s;
+    user-select: none; -webkit-tap-highlight-color: transparent; overflow: hidden;
+  }
+  .cell::after { /* locked slot marker */
+    content: "🔒"; position: absolute; font-size: 15px; opacity: .18; filter: grayscale(1);
+    transition: opacity .2s;
+  }
+  .cell .num {
+    position: absolute; top: 7px; left: 10px;
+    font-size: 12px; font-weight: 800; color: var(--ink-soft); opacity: .5;
+    font-variant-numeric: tabular-nums; z-index: 2;
+  }
+  .cell:hover { transform: translateY(-3px); border-color: var(--cyan); box-shadow: 0 10px 24px rgba(0,0,0,.4); }
+  .cell:focus-visible { outline: 2px solid var(--cyan); outline-offset: 2px; }
+  .cell.stamped {
+    background: radial-gradient(circle at 50% 40%, rgba(255,210,100,.22), rgba(255,210,100,.05));
+    border-color: var(--gold);
+    box-shadow: 0 0 0 1px rgba(255,210,100,.5), 0 0 22px rgba(255,210,100,.3), inset 0 0 20px rgba(255,210,100,.12);
+  }
+  .cell.stamped::after { opacity: 0; }
+  .cell .mark {
+    transform: scale(0) rotate(-20deg); opacity: 0; z-index: 1;
+    filter: drop-shadow(0 0 8px rgba(255,210,100,.55));
+  }
+  .cell.stamped .mark { animation: pop .4s cubic-bezier(.2,1.6,.4,1) forwards; }
+  @keyframes pop {
+    0% { transform: scale(0) rotate(-20deg); opacity: 0; }
+    70% { transform: scale(1.25) rotate(8deg); opacity: 1; }
+    100% { transform: scale(1) rotate(-3deg); opacity: 1; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .cell.stamped .mark { animation: none; transform: scale(1); opacity: 1; }
+    .cell:hover { transform: none; }
+  }
+
+  /* ---- progress ---- */
+  .progress-wrap { margin: 26px 0 4px; display: flex; align-items: center; gap: 16px; }
+  .bar {
+    flex: 1; height: 14px; border-radius: 8px; background: var(--slot);
+    border: 1px solid var(--line); overflow: hidden; position: relative;
+  }
+  .bar > i {
+    display: block; height: 100%; width: 0%;
+    background: linear-gradient(90deg, var(--violet), var(--cyan), var(--gold));
+    box-shadow: 0 0 14px rgba(56,225,255,.6);
+    border-radius: 8px; transition: width .5s cubic-bezier(.3,1,.4,1);
+  }
+  .count { font-weight: 900; font-size: 20px; font-variant-numeric: tabular-nums; white-space: nowrap; letter-spacing: -.02em; }
+  .count b { color: var(--gold); }
+  .count .t { color: var(--ink-soft); }
+
+  /* ---- celebrate ---- */
+  .cheer {
+    text-align: center; font-size: 19px; font-weight: 900; margin-top: 16px; min-height: 26px;
+    color: var(--gold); text-shadow: 0 0 18px rgba(255,210,100,.5); letter-spacing: .01em;
+    opacity: 0; transform: translateY(6px); transition: opacity .3s, transform .3s;
+  }
+  .cheer.show { opacity: 1; transform: none; }
+
+  /* ---- footer ---- */
+  footer { margin-top: 26px; display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
+  button.act {
+    font: inherit; font-weight: 800; cursor: pointer; letter-spacing: .02em;
+    border-radius: 12px; padding: 12px 24px; border: 1px solid var(--line);
+    background: var(--slot); color: var(--ink);
+    transition: transform .14s, box-shadow .14s, border-color .14s;
+  }
+  button.act:hover { transform: translateY(-2px); border-color: var(--ink-soft); }
+  button.act:focus-visible { outline: 2px solid var(--cyan); outline-offset: 2px; }
+  button.primary {
+    background: linear-gradient(180deg, var(--gold), var(--gold-deep)); color: #201700; border: none;
+    box-shadow: 0 8px 24px rgba(255,210,100,.3);
+  }
+
+  .hint { text-align: center; color: var(--ink-soft); font-size: 13px; margin-top: 18px; }
+
+  canvas#confetti { position: fixed; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 50; }
+
+  @media print {
+    body { background: #fff; color: #111; padding: 0; }
+    body::before { display: none; }
+    .board { box-shadow: none; border-color: #ccc; background: #fff; backdrop-filter: none; }
+    .title { -webkit-text-fill-color: #111; color: #111; }
+    .toolbar, footer, .hint { display: none !important; }
+    .cell { cursor: default; }
+  }
+</style>
+</head>
+<body>
+
+<canvas id="confetti"></canvas>
+
+<div class="board">
+  <header>
+    <div class="eyebrow">Achievement Board</div>
+    <h1 class="title" contenteditable="true" spellcheck="false">칭찬 도장 판</h1>
+    <div class="name-row">
+      <span class="edit-name" contenteditable="true" spellcheck="false">우리 아이</span>
+      의 도전 기록
+    </div>
+  </header>
+
+  <div class="reward">
+    <span class="gift">🏆</span>
+    <div>
+      <div class="lbl">Final Reward</div>
+      <div class="txt" contenteditable="true" spellcheck="false">아이스크림 먹으러 가기!</div>
+    </div>
+  </div>
+
+  <div class="toolbar">
+    <div class="group">
+      <span class="cap">Stamp</span>
+      <div id="picker"></div>
+    </div>
+    <div class="group">
+      <span class="cap">Slots</span>
+      <select id="size">
+        <option value="10">10칸</option>
+        <option value="15">15칸</option>
+        <option value="20" selected>20칸</option>
+        <option value="25">25칸</option>
+        <option value="30">30칸</option>
+      </select>
+    </div>
+  </div>
+
+  <div class="grid" id="grid"></div>
+
+  <div class="progress-wrap">
+    <div class="bar"><i id="fill"></i></div>
+    <div class="count"><b id="done">0</b> <span class="t">/ <span id="total">20</span></span></div>
+  </div>
+
+  <div class="cheer" id="cheer"></div>
+
+  <footer>
+    <button class="act primary" id="print">🖨️ 인쇄하기</button>
+    <button class="act" id="reset">↺ 초기화</button>
+  </footer>
+
+  <p class="hint">칸을 눌러 도장을 찍어요 · 제목·이름·보상은 눌러서 바꿀 수 있어요</p>
+</div>
+
+<script>
+(function () {
+  var STAMPS = ["🏆", "⭐", "⚡", "🔥", "💎", "🎯", "👑", "🚀"];
+  var picker = document.getElementById("picker");
+  var grid = document.getElementById("grid");
+  var sizeSel = document.getElementById("size");
+  var fill = document.getElementById("fill");
+  var doneEl = document.getElementById("done");
+  var totalEl = document.getElementById("total");
+  var cheer = document.getElementById("cheer");
+
+  var current = STAMPS[0];
+  var total = parseInt(sizeSel.value, 10);
+  var marks = {};
+  var wasFull = false;
+
+  function save() {
+    try { localStorage.setItem("chingchan2", JSON.stringify({ total: total, current: current, marks: marks })); } catch (e) {}
+  }
+  function load() {
+    try {
+      var raw = localStorage.getItem("chingchan2");
+      if (!raw) return;
+      var d = JSON.parse(raw);
+      if (d.total) { total = d.total; sizeSel.value = String(d.total); }
+      if (d.current) current = d.current;
+      if (d.marks) marks = d.marks;
+    } catch (e) {}
+  }
+
+  STAMPS.forEach(function (s) {
+    var b = document.createElement("button");
+    b.className = "stamp-pick"; b.type = "button"; b.textContent = s;
+    b.setAttribute("aria-label", "도장 " + s);
+    b.addEventListener("click", function () { current = s; syncPicker(); save(); });
+    picker.appendChild(b);
+  });
+  function syncPicker() {
+    picker.querySelectorAll(".stamp-pick").forEach(function (b) {
+      b.classList.toggle("active", b.textContent === current);
+    });
+  }
+
+  function build() {
+    grid.innerHTML = "";
+    for (var i = 0; i < total; i++) {
+      (function (idx) {
+        var c = document.createElement("button");
+        c.className = "cell"; c.type = "button";
+        c.setAttribute("aria-label", (idx + 1) + "번 칸");
+        var num = document.createElement("span"); num.className = "num"; num.textContent = idx + 1;
+        var mark = document.createElement("span"); mark.className = "mark";
+        c.appendChild(num); c.appendChild(mark);
+        if (marks[idx]) { c.classList.add("stamped"); mark.textContent = marks[idx]; }
+        c.addEventListener("click", function () { toggle(idx, c, mark); });
+        grid.appendChild(c);
+      })(i);
+    }
+    totalEl.textContent = total;
+    update();
+  }
+
+  function toggle(idx, cell, mark) {
+    if (marks[idx]) {
+      delete marks[idx]; cell.classList.remove("stamped"); mark.textContent = "";
+    } else {
+      marks[idx] = current; mark.textContent = current;
+      cell.classList.remove("stamped"); void cell.offsetWidth; cell.classList.add("stamped");
+    }
+    update(); save();
+  }
+
+  function count() {
+    var n = 0;
+    for (var k in marks) if (marks.hasOwnProperty(k) && k < total) n++;
+    return n;
+  }
+
+  function update() {
+    var n = count();
+    doneEl.textContent = n;
+    fill.style.width = (total ? (n / total * 100) : 0) + "%";
+    var full = n >= total && total > 0;
+    if (full) {
+      cheer.textContent = "🎉 MISSION COMPLETE — 모든 도장을 모았어요! 🎉";
+      cheer.classList.add("show");
+      if (!wasFull) celebrate();
+    } else {
+      cheer.classList.remove("show");
+    }
+    wasFull = full;
+  }
+
+  sizeSel.addEventListener("change", function () {
+    total = parseInt(sizeSel.value, 10);
+    for (var k in marks) if (marks.hasOwnProperty(k) && k >= total) delete marks[k];
+    wasFull = false; build(); save();
+  });
+  document.getElementById("reset").addEventListener("click", function () {
+    marks = {}; wasFull = false; build(); save();
+  });
+  document.getElementById("print").addEventListener("click", function () { window.print(); });
+
+  // ---- confetti ----
+  var canvas = document.getElementById("confetti");
+  var ctx = canvas.getContext("2d");
+  var pieces = []; var raf = null;
+  var reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+  function resize() { canvas.width = window.innerWidth; canvas.height = window.innerHeight; }
+  window.addEventListener("resize", resize); resize();
+
+  function celebrate() {
+    if (reduce) return;
+    var colors = ["#FFD264", "#38E1FF", "#7C6CFF", "#FF6BA6", "#7CF29A"];
+    for (var i = 0; i < 150; i++) {
+      pieces.push({
+        x: canvas.width / 2 + (i % 20 - 10) * 8,
+        y: canvas.height / 3,
+        vx: (i * 7 % 100 / 100 - 0.5) * 10,
+        vy: -(i * 13 % 100 / 100) * 12 - 4,
+        s: 6 + (i * 5 % 9),
+        c: colors[i % colors.length],
+        rot: i, vr: (i % 7 - 3) * 0.2, life: 0
+      });
+    }
+    if (!raf) tick();
+  }
+  function tick() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    var alive = false;
+    for (var i = 0; i < pieces.length; i++) {
+      var p = pieces[i];
+      if (p.life > 230) continue;
+      alive = true; p.life++;
+      p.vy += 0.3; p.x += p.vx; p.y += p.vy; p.rot += p.vr;
+      ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(p.rot);
+      ctx.globalAlpha = Math.max(0, 1 - p.life / 230);
+      ctx.fillStyle = p.c;
+      ctx.fillRect(-p.s / 2, -p.s / 2, p.s, p.s * 0.6);
+      ctx.restore();
+    }
+    if (alive) { raf = requestAnimationFrame(tick); }
+    else { pieces = []; raf = null; ctx.clearRect(0, 0, canvas.width, canvas.height); }
+  }
+
+  load(); syncPicker(); build();
+})();
+</script>
+
+</body>
+</html>
