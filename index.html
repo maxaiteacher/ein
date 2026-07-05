@@ -212,12 +212,37 @@
 
   canvas#confetti { position: fixed; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 50; }
 
+  /* ---- 비밀 초기화 점 & 토스트 ---- */
+  .secret-reset {
+    position: absolute; right: 14px; bottom: 12px; z-index: 3;
+    width: 24px; height: 24px; border-radius: 50%; padding: 0; border: none;
+    background: transparent; cursor: pointer; opacity: .1;
+    display: grid; place-items: center; transition: opacity .2s;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .secret-reset:hover { opacity: .45; }
+  .secret-reset:focus-visible { opacity: .6; outline: 2px solid var(--cyan); outline-offset: 2px; }
+  .secret-reset i { width: 7px; height: 7px; border-radius: 50%; background: var(--ink-soft); transition: transform .1s; }
+  .secret-reset.holding { opacity: 1; }
+  .secret-reset.holding i { background: var(--cyan); animation: holdgrow 1.5s linear forwards; }
+  @keyframes holdgrow { from { transform: scale(1); } to { transform: scale(2.6); } }
+  @media (prefers-reduced-motion: reduce) { .secret-reset.holding i { animation: none; transform: scale(2.4); } }
+
+  .toast {
+    position: fixed; left: 50%; bottom: 28px; transform: translate(-50%, 18px);
+    background: var(--panel-2); color: var(--ink); border: 1px solid var(--line);
+    border-radius: 12px; padding: 11px 20px; font-weight: 800; font-size: 15px;
+    box-shadow: 0 14px 34px rgba(0,0,0,.45); z-index: 60;
+    opacity: 0; pointer-events: none; transition: opacity .25s, transform .25s;
+  }
+  .toast.show { opacity: 1; transform: translate(-50%, 0); }
+
   @media print {
     body { background: #fff; color: #111; padding: 0; }
     body::before { display: none; }
     .board { box-shadow: none; border-color: #ccc; background: #fff; backdrop-filter: none; }
     .title { -webkit-text-fill-color: #111; color: #111; }
-    .toolbar, footer, .hint { display: none !important; }
+    .toolbar, footer, .hint, .secret-reset, .toast { display: none !important; }
     .cell { cursor: default; }
   }
 </style>
@@ -271,11 +296,14 @@
   <div class="cheer" id="cheer"></div>
 
   <footer>
-    <button class="act primary" id="print">🖨️ 인쇄하기</button>
-    <button class="act" id="reset">↺ 초기화</button>
+    <button class="act primary" id="save">💾 저장하기</button>
+    <button class="act" id="print">🖨️ 인쇄하기</button>
   </footer>
 
   <p class="hint">칸을 눌러 도장을 찍어요 · 제목·이름·보상은 눌러서 바꿀 수 있어요</p>
+
+  <button class="secret-reset" id="secret" type="button" aria-label="비밀 초기화 — 길게 누르기"><i></i></button>
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
 </div>
 
 <script>
@@ -288,6 +316,10 @@
   var doneEl = document.getElementById("done");
   var totalEl = document.getElementById("total");
   var cheer = document.getElementById("cheer");
+  var elTitle = document.querySelector(".title");
+  var elName = document.querySelector(".edit-name");
+  var elReward = document.querySelector(".reward .txt");
+  var toastEl = document.getElementById("toast");
 
   var current = STAMPS[0];
   var total = parseInt(sizeSel.value, 10);
@@ -295,7 +327,18 @@
   var wasFull = false;
 
   function save() {
-    try { localStorage.setItem("chingchan2", JSON.stringify({ total: total, current: current, marks: marks })); } catch (e) {}
+    try {
+      localStorage.setItem("chingchan2", JSON.stringify({
+        total: total, current: current, marks: marks,
+        title: elTitle.textContent, name: elName.textContent, reward: elReward.textContent
+      }));
+    } catch (e) {}
+  }
+  function toast(msg) {
+    toastEl.textContent = msg;
+    toastEl.classList.add("show");
+    clearTimeout(toast._t);
+    toast._t = setTimeout(function () { toastEl.classList.remove("show"); }, 1800);
   }
   function load() {
     try {
@@ -305,6 +348,9 @@
       if (d.total) { total = d.total; sizeSel.value = String(d.total); }
       if (d.current) current = d.current;
       if (d.marks) marks = d.marks;
+      if (typeof d.title === "string") elTitle.textContent = d.title;
+      if (typeof d.name === "string") elName.textContent = d.name;
+      if (typeof d.reward === "string") elReward.textContent = d.reward;
     } catch (e) {}
   }
 
@@ -376,10 +422,35 @@
     for (var k in marks) if (marks.hasOwnProperty(k) && k >= total) delete marks[k];
     wasFull = false; build(); save();
   });
-  document.getElementById("reset").addEventListener("click", function () {
-    marks = {}; wasFull = false; build(); save();
+  document.getElementById("save").addEventListener("click", function () {
+    save(); toast("저장되었어요 ✓");
   });
   document.getElementById("print").addEventListener("click", function () { window.print(); });
+
+  // 편집 내용(제목·이름·보상)은 포커스가 빠질 때 자동 저장
+  [elTitle, elName, elReward].forEach(function (el) {
+    el.addEventListener("blur", save);
+  });
+
+  // ---- 비밀 초기화: 오른쪽 아래 점을 1.5초 길게 누르기 ----
+  var secret = document.getElementById("secret");
+  var holdTimer = null;
+  function startHold(e) {
+    if (e) e.preventDefault();
+    secret.classList.add("holding");
+    holdTimer = setTimeout(function () {
+      secret.classList.remove("holding");
+      if (window.confirm("정말 모든 도장을 지울까요? 되돌릴 수 없어요.")) {
+        marks = {}; wasFull = false; build(); save(); toast("초기화되었어요");
+      }
+    }, 1500);
+  }
+  function cancelHold() { clearTimeout(holdTimer); secret.classList.remove("holding"); }
+  secret.addEventListener("mousedown", startHold);
+  secret.addEventListener("touchstart", startHold, { passive: false });
+  ["mouseup", "mouseleave", "touchend", "touchcancel"].forEach(function (ev) {
+    secret.addEventListener(ev, cancelHold);
+  });
 
   // ---- confetti ----
   var canvas = document.getElementById("confetti");
