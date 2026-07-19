@@ -1,0 +1,1164 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>승부차기</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Noto+Sans+KR:wght@400;500;700;900&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --pitch-deep:#0a2f2a; --pitch:#0f4d40; --pitch-glow:#1c7a63;
+    --floodlight:#f7e9a3; --net:#e8f2ee;
+    --accent:#ff5b3d; --accent-2:#ffd23f;
+    --ink:#eafff7; --ink-dim:#8fb8ac; --line:rgba(232,242,238,.22);
+    --keeper-kit:#ff5b3d; --kicker-kit:#2f7fff;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%}
+  body{
+    font-family:"Noto Sans KR",system-ui,sans-serif;
+    background:
+      radial-gradient(120% 80% at 50% -10%, rgba(247,233,163,.16), transparent 55%),
+      radial-gradient(90% 60% at 50% 120%, rgba(28,122,99,.4), transparent 60%),
+      linear-gradient(180deg,#06231f 0%, #0a2f2a 45%, #072721 100%);
+    color:var(--ink); min-height:100dvh;
+    display:flex; align-items:center; justify-content:center;
+    padding:20px; overflow-x:hidden;
+  }
+  .stage{width:100%;max-width:520px;display:flex;flex-direction:column;gap:14px}
+
+  /* scoreboard */
+  .board{
+    display:flex;align-items:stretch;justify-content:space-between;
+    border:1px solid var(--line);border-radius:14px;
+    background:linear-gradient(180deg, rgba(255,255,255,.05), rgba(0,0,0,.15));overflow:hidden;
+  }
+  .side{flex:1;padding:11px 14px;display:flex;flex-direction:column;gap:1px;transition:background .3s;min-width:0}
+  .side.active{background:rgba(255,91,61,.14)}
+  .side .who{font-size:11px;letter-spacing:.02em;color:var(--ink-dim);font-weight:700;
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .side .who .flag{font-size:15px;margin-right:4px}
+  .side .score{font-family:"Bebas Neue",sans-serif;font-size:50px;line-height:.9}
+  .side.you .score{color:var(--accent-2)}
+  .side.cpu{text-align:right;align-items:flex-end}
+  .center{display:flex;flex-direction:column;align-items:center;justify-content:center;
+    padding:10px 8px;min-width:92px;background:rgba(0,0,0,.22)}
+  .center .label{font-size:10px;letter-spacing:.2em;color:var(--ink-dim);font-weight:700}
+  .center .round{font-family:"Bebas Neue",sans-serif;font-size:30px;line-height:1;color:var(--floodlight)}
+  .center .sd{font-size:10px;letter-spacing:.14em;color:var(--accent);font-weight:700;margin-top:2px;min-height:12px}
+
+  /* tracker dots */
+  .tracker{display:flex;gap:8px;justify-content:space-between;padding:0 2px}
+  .tracker .row{display:flex;gap:6px;align-items:center;flex:1}
+  .tracker .row.cpu{justify-content:flex-end}
+  .tracker .tag{font-size:10px;letter-spacing:.12em;color:var(--ink-dim);font-weight:700;min-width:30px}
+  .dot{width:13px;height:13px;border-radius:50%;border:1.5px solid var(--line);background:transparent;transition:.25s}
+  .dot.goal{background:var(--accent-2);border-color:var(--accent-2);box-shadow:0 0 10px rgba(255,210,63,.6)}
+  .dot.miss{border-color:var(--accent);position:relative}
+  .dot.miss::after{content:"";position:absolute;inset:3px;background:var(--accent);border-radius:50%;opacity:.4}
+
+  /* field */
+  .field{position:relative;aspect-ratio:5/4;border-radius:16px;overflow:hidden;
+    background:linear-gradient(180deg,#0c1e19 0%,#103a30 40%,#0f4d40 62%,#0c3e33 100%);
+    border:1px solid var(--line);
+    box-shadow:0 30px 60px -30px rgba(0,0,0,.8), inset 0 1px 0 rgba(255,255,255,.05);
+    user-select:none;}
+  .field::before{content:"";position:absolute;inset:0;
+    background:radial-gradient(70% 45% at 50% 8%, rgba(247,233,163,.22), transparent 60%);pointer-events:none}
+  /* crowd band */
+  .crowd{position:absolute;top:0;left:0;right:0;height:12%;
+    background:repeating-linear-gradient(90deg,#0b1714 0 6px,#132a23 6px 12px,#0e1f1a 12px 18px);
+    opacity:.7;filter:blur(.4px)}
+  svg.goal{position:absolute;inset:0;width:100%;height:100%;display:block}
+
+  /* zones */
+  .zones{position:absolute;left:0;right:0;top:0;height:52%;
+    display:grid;grid-template-columns:repeat(3,1fr);grid-template-rows:1fr 1fr;
+    padding:9% 12% 0;gap:4px;z-index:5;}
+  .zone{border-radius:10px;border:1.5px dashed rgba(232,242,238,.28);
+    display:flex;align-items:center;justify-content:center;cursor:pointer;
+    transition:background .15s,border-color .15s,transform .1s;
+    color:rgba(234,255,247,.55);-webkit-tap-highlight-color:transparent;}
+  .zone:hover{background:rgba(255,91,61,.16);border-color:var(--accent)}
+  .zone:active{transform:scale(.97)}
+  .zone .n{opacity:.5;font-family:"Bebas Neue",sans-serif;font-size:22px}
+  .zones.hidden{display:none}
+  .zone:focus-visible{outline:3px solid var(--accent-2);outline-offset:2px}
+
+  /* keeper */
+  .keeper{position:absolute;z-index:4;bottom:30%;left:50%;width:16%;height:34%;
+    transform:translateX(-50%);
+    transition:transform .38s cubic-bezier(.22,.9,.3,1.2), bottom .38s;}
+  .keeper .body{width:100%;height:100%;position:relative}
+  .keeper .torso{position:absolute;left:22%;top:26%;width:56%;height:50%;
+    background:var(--keeper-kit);border-radius:36% 36% 22% 22%;box-shadow:inset 0 -6px 0 rgba(0,0,0,.2)}
+  .keeper .head{position:absolute;left:30%;top:-4%;width:40%;aspect-ratio:.9}
+  .keeper .head svg{width:100%;height:100%;display:block}
+  .keeper .armL,.keeper .armR{position:absolute;top:28%;width:15%;height:42%;background:var(--keeper-kit);
+    border-radius:20px;transform-origin:top center;transition:transform .3s}
+  .keeper .armL{left:6%} .keeper .armR{right:6%}
+  .keeper .glove{position:absolute;bottom:-10%;left:-22%;width:144%;height:26%;
+    background:#ffd23f;border-radius:8px;border:2px solid rgba(0,0,0,.22)}
+  .keeper .legL,.keeper .legR{position:absolute;bottom:0;width:18%;height:32%;background:#1a1a1f;border-radius:10px}
+  .keeper .legL{left:26%} .keeper .legR{right:26%}
+
+  /* kicker (foreground penalty taker) */
+  .kicker{position:absolute;z-index:5;bottom:1%;left:36%;width:16%;height:33%;
+    transform:translateX(-50%);pointer-events:none}
+  .kicker.hidden{display:none}
+  .kicker .body{width:100%;height:100%;position:relative}
+  .kicker .torso{position:absolute;left:22%;top:26%;width:56%;height:44%;
+    background:var(--kicker-kit);border-radius:34% 34% 20% 20%;box-shadow:inset 0 -6px 0 rgba(0,0,0,.2)}
+  .kicker .head{position:absolute;left:31%;top:-2%;width:38%;aspect-ratio:.9}
+  .kicker .head svg{width:100%;height:100%;display:block}
+  .kicker .armL,.kicker .armR{position:absolute;top:30%;width:13%;height:34%;background:var(--kicker-kit);border-radius:16px;transform-origin:top center;transition:transform .25s}
+  .kicker .armL{left:9%;transform:rotate(14deg)} .kicker .armR{right:9%;transform:rotate(-14deg)}
+  .kicker .armband{position:absolute;top:6%;left:-1px;right:-1px;height:16%;background:var(--accent-2);border-radius:2px;box-shadow:0 0 0 1px rgba(0,0,0,.25)}
+  .kicker .legL,.kicker .legR{position:absolute;bottom:0;width:17%;height:34%;background:#e8e8e8;border-radius:9px;transform-origin:top center;transition:transform .2s}
+  .kicker .legL{left:28%} .kicker .legR{right:28%}
+  /* captain celebration: knee slide */
+  .kicker.celebrate .armL{transform:rotate(-62deg)}
+  .kicker.celebrate .armR{transform:rotate(62deg)}
+  .kicker.celebrate .legL{transform:rotate(20deg)}
+  .kicker.celebrate .legR{transform:rotate(-8deg)}
+  .kicker.celebrate{animation:kneeslide 1.15s cubic-bezier(.18,.7,.28,1)}
+  .kicker.celebrate.big{animation:kneeslide 1.75s cubic-bezier(.18,.7,.28,1)}
+  @keyframes kneeslide{
+    0%{transform:translateX(-50%) translate(0,0) rotate(0)}
+    14%{transform:translateX(-50%) translate(10%,8%) rotate(-7deg)}
+    58%{transform:translateX(-50%) translate(140%,10%) rotate(-12deg)}
+    74%{transform:translateX(-50%) translate(146%,10%) rotate(-10deg)}
+    100%{transform:translateX(-50%) translate(0,0) rotate(0)}
+  }
+  /* signature celebrations (no real-person likeness) */
+  .kicker.sig .armL,.kicker.sig .armR,.kicker.sig .legL,.kicker.sig .legR{transition:transform .3s}
+  .kicker.sig-sky .armL{transform:rotate(-163deg)} .kicker.sig-sky .armR{transform:rotate(163deg)}
+  .kicker.sig-sky{animation:sighop 1.7s ease-out}
+  .kicker.sig-cross .armL{transform:rotate(74deg)} .kicker.sig-cross .armR{transform:rotate(-74deg)}
+  .kicker.sig-cross{animation:sigstand 1.7s ease-in-out}
+  .kicker.sig-siuu .armL{transform:rotate(-46deg)} .kicker.sig-siuu .armR{transform:rotate(46deg)}
+  .kicker.sig-siuu .legL{transform:rotate(-16deg)} .kicker.sig-siuu .legR{transform:rotate(16deg)}
+  .kicker.sig-siuu{animation:sigjump 1.7s cubic-bezier(.2,.8,.3,1)}
+  @keyframes sighop{0%{transform:translateX(-50%) translateY(0)}28%{transform:translateX(-50%) translateY(-11%)}46%{transform:translateX(-50%) translateY(0)}64%{transform:translateX(-50%) translateY(-5%)}100%{transform:translateX(-50%) translateY(0)}}
+  @keyframes sigstand{0%{transform:translateX(-50%) scale(1)}22%{transform:translateX(-50%) scale(1.05)}100%{transform:translateX(-50%) scale(1)}}
+  @keyframes sigjump{0%{transform:translateX(-50%) translateY(0) rotate(0)}32%{transform:translateX(-50%) translateY(-28%) rotate(6deg)}56%{transform:translateX(-50%) translateY(0) rotate(0)}72%{transform:translateX(-50%) translateY(-7%)}100%{transform:translateX(-50%) translateY(0)}}
+
+  /* ball */
+  .ball{position:absolute;z-index:6;width:9%;aspect-ratio:1;left:50%;top:86%;
+    transform:translate(-50%,-50%);
+    transition:left .55s cubic-bezier(.4,.1,.6,1), top .55s cubic-bezier(.35,.02,.5,1), width .55s;pointer-events:none}
+  .ball svg{width:100%;height:100%;display:block;filter:drop-shadow(0 6px 8px rgba(0,0,0,.4))}
+  .ball.spin svg{animation:spin .55s linear}
+  @keyframes spin{to{transform:rotate(360deg)}}
+
+  /* aim target */
+  .aim{position:absolute;z-index:5;width:12%;aspect-ratio:1;left:50%;top:20%;
+    transform:translate(-50%,-50%);border:3px solid var(--accent-2);border-radius:50%;
+    box-shadow:0 0 14px rgba(255,210,63,.7), inset 0 0 8px rgba(255,210,63,.35);
+    opacity:0;transition:opacity .18s, left .15s, top .15s;pointer-events:none}
+  .aim::after{content:"";position:absolute;left:50%;top:50%;width:22%;height:22%;
+    background:var(--accent-2);border-radius:50%;transform:translate(-50%,-50%);box-shadow:0 0 8px rgba(255,210,63,.9)}
+  .aim.show{opacity:1;animation:aimpulse 1s ease-in-out infinite}
+  @keyframes aimpulse{0%,100%{transform:translate(-50%,-50%) scale(1)}50%{transform:translate(-50%,-50%) scale(1.14)}}
+
+  /* power meter */
+  .power{position:absolute;z-index:8;left:8%;right:8%;bottom:6%;display:flex;flex-direction:column;
+    align-items:center;gap:8px}
+  .power.hidden{display:none}
+  .ptrack{position:relative;width:100%;height:16px;border-radius:999px;overflow:hidden;
+    background:rgba(0,0,0,.4);border:1px solid var(--line);
+    background-image:linear-gradient(90deg,#3fd07a 0%,#ffd23f 55%,#ff5b3d 100%);
+    background-blend-mode:soft-light;}
+  .pfill{position:absolute;top:0;left:0;bottom:0;width:0%;background:rgba(255,255,255,.28)}
+  .pmark{position:absolute;top:-3px;bottom:-3px;left:0%;width:4px;background:#fff;
+    box-shadow:0 0 8px rgba(255,255,255,.9);transform:translateX(-2px)}
+  .pbtn{appearance:none;border:none;cursor:pointer;font-family:"Bebas Neue",sans-serif;
+    font-size:20px;letter-spacing:.06em;padding:8px 26px;border-radius:999px;color:#06231f;
+    background:linear-gradient(180deg,#fff,var(--floodlight));box-shadow:0 8px 20px -8px rgba(0,0,0,.6)}
+  .pbtn:active{transform:translateY(1px)}
+  .plabel{font-size:11px;color:var(--ink);letter-spacing:.08em;text-shadow:0 1px 3px rgba(0,0,0,.6)}
+
+  /* status */
+  .status{min-height:26px;text-align:center;font-weight:700;font-size:15px;color:var(--floodlight)}
+  .status .cool{color:var(--accent-2)} .status .bad{color:var(--accent)}
+  .hint{text-align:center;font-size:12.5px;color:var(--ink-dim)}
+
+  /* overlay */
+  .overlay{position:fixed;inset:0;z-index:60;overflow-y:auto;-webkit-overflow-scrolling:touch;
+    background:linear-gradient(180deg,rgba(6,35,31,.94),rgba(6,35,31,.98));backdrop-filter:blur(3px)}
+  .overlay-inner{min-height:100%;display:flex;flex-direction:column;
+    align-items:center;justify-content:center;text-align:center;gap:12px;padding:28px 20px 40px}
+  .overlay.hidden{display:none}
+  .overlay h1{font-family:"Bebas Neue",sans-serif;font-size:clamp(40px,12vw,64px);line-height:.86;letter-spacing:.03em;
+    background:linear-gradient(180deg,#fff,var(--floodlight));-webkit-background-clip:text;background-clip:text;color:transparent}
+  .overlay p{color:var(--ink-dim);font-size:13px;max-width:300px;line-height:1.5}
+  .overlay .res{font-family:"Bebas Neue",sans-serif;font-size:26px;color:var(--accent-2)}
+  .pickttl{font-size:12px;letter-spacing:.16em;color:var(--ink-dim);font-weight:700;text-transform:uppercase}
+  .grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;width:100%;max-width:360px}
+  .flagbtn{appearance:none;cursor:pointer;border:1px solid var(--line);border-radius:12px;
+    background:rgba(255,255,255,.04);color:var(--ink);padding:9px 4px 8px;display:flex;flex-direction:column;
+    align-items:center;gap:3px;transition:.15s;-webkit-tap-highlight-color:transparent}
+  .flagbtn:hover{border-color:var(--accent);background:rgba(255,91,61,.12);transform:translateY(-2px)}
+  .flagbtn.sel{border-color:var(--accent-2);background:rgba(255,210,63,.16);box-shadow:0 0 0 2px rgba(255,210,63,.3)}
+  .flagbtn .f{font-size:26px;line-height:1}
+  .flagbtn .cn{font-size:11px;font-weight:700}
+  .flagbtn .rt{font-family:"Bebas Neue",sans-serif;font-size:15px;line-height:1;color:var(--accent-2);letter-spacing:.04em}
+  .vs b{color:var(--accent-2);font-weight:700}
+
+  /* mode toggle */
+  .modes{display:flex;flex-wrap:wrap;justify-content:center;gap:6px;background:rgba(0,0,0,.28);border:1px solid var(--line);border-radius:999px;padding:4px}
+  .modebtn{appearance:none;border:none;cursor:pointer;font-family:"Noto Sans KR",sans-serif;font-weight:700;
+    font-size:13px;letter-spacing:.02em;padding:8px 16px;border-radius:999px;background:transparent;color:var(--ink-dim);transition:.15s}
+  .modebtn.sel{background:linear-gradient(180deg,var(--accent),#e0421f);color:#fff}
+  .modebtn:focus-visible{outline:3px solid var(--accent-2);outline-offset:2px}
+
+  /* group tables */
+  .groups{width:100%;max-width:440px;display:flex;flex-direction:column;gap:11px}
+  .grp{border:1px solid var(--line);border-radius:10px;overflow:hidden;background:rgba(255,255,255,.03)}
+  .grp-h{font-size:11px;letter-spacing:.16em;font-weight:700;color:var(--floodlight);padding:6px 10px;background:rgba(0,0,0,.25);text-align:left}
+  .grow{display:grid;grid-template-columns:16px 20px 1fr 20px 20px 30px 26px;align-items:center;gap:4px;padding:5px 10px;font-size:12.5px;color:var(--ink-dim)}
+  .grow.ghead{font-size:9px;letter-spacing:.04em;color:var(--ink-dim);opacity:.75;padding-top:6px;padding-bottom:2px}
+  .grow .pos{font-family:"Bebas Neue",sans-serif;font-size:14px;text-align:center;color:var(--ink-dim)}
+  .grow .tf{font-size:15px}
+  .grow .tn{text-align:left;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--ink)}
+  .grow .st{text-align:center;font-variant-numeric:tabular-nums}
+  .grow .pts{font-family:"Bebas Neue",sans-serif;font-size:16px;color:var(--ink)}
+  .grow.meRow .tn{color:var(--accent-2);font-weight:700}
+  .grow.qual{background:rgba(63,208,122,.13)}
+  .grow.qual .pos{color:#3fd07a}
+  .grow.qual.wild{background:rgba(91,178,255,.15)}
+  .grow.qual.wild .pos{color:#5bb2ff}
+  .grow .wc{font-size:9px;font-weight:800;color:#5bb2ff;letter-spacing:.06em;
+    border:1px solid rgba(91,178,255,.6);border-radius:4px;padding:0 3px;margin-left:5px;vertical-align:middle}
+
+  /* scenario (경우의 수) panel */
+  .scenario{width:100%;max-width:440px;border:1px solid var(--line);border-radius:12px;
+    background:rgba(255,255,255,.04);padding:11px 14px;display:flex;flex-direction:column;gap:6px;text-align:left}
+  .scenario.danger{border-color:var(--accent);background:rgba(255,91,61,.1)}
+  .scenario .sc-h{font-size:11px;letter-spacing:.14em;font-weight:700;color:var(--floodlight);text-transform:uppercase}
+  .scenario.danger .sc-h{color:var(--accent)}
+  .scenario .sc-l{font-size:13px;color:var(--ink);line-height:1.45}
+
+  /* bracket */
+  .bracket{width:100%;max-width:420px;display:flex;flex-direction:column;gap:14px;margin:4px 0}
+  .brd-round{display:flex;flex-direction:column;gap:7px}
+  .brd-round .rl{font-size:11px;letter-spacing:.18em;color:var(--floodlight);font-weight:700;text-transform:uppercase;text-align:left}
+  .match{display:flex;flex-direction:column;gap:3px;border:1px solid var(--line);border-radius:10px;
+    padding:7px 10px;background:rgba(255,255,255,.03)}
+  .match.mine{border-color:var(--accent-2);box-shadow:0 0 0 1px rgba(255,210,63,.25)}
+  .team{display:flex;align-items:center;gap:8px;font-size:13.5px;color:var(--ink-dim);font-weight:500}
+  .team .tf{font-size:16px}
+  .team .tn{flex:1;text-align:left;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .team .ts{font-family:"Bebas Neue",sans-serif;font-size:18px;color:var(--ink-dim);min-width:16px;text-align:right}
+  .team.win{color:var(--ink)}
+  .team.win .ts{color:var(--accent-2)}
+  .team.out{opacity:.42;text-decoration:line-through}
+  .team.meRow .tn{color:var(--accent-2);font-weight:700}
+  .nextTag{align-self:flex-start;font-size:10px;letter-spacing:.12em;color:var(--accent);font-weight:700;margin-top:1px}
+  .champ{font-family:"Bebas Neue",sans-serif;font-size:30px;color:var(--accent-2);letter-spacing:.03em}
+  .btn{appearance:none;border:none;cursor:pointer;font-family:"Bebas Neue",sans-serif;font-size:22px;letter-spacing:.06em;
+    padding:11px 34px;border-radius:999px;background:linear-gradient(180deg,var(--accent),#e0421f);color:#fff;
+    box-shadow:0 10px 24px -8px rgba(255,91,61,.7);transition:.12s}
+  .btn:disabled{opacity:.4;cursor:not-allowed}
+  .btn:not(:disabled):hover{transform:translateY(-2px)}
+  .btn:focus-visible,.flagbtn:focus-visible,.pbtn:focus-visible{outline:3px solid var(--accent-2);outline-offset:3px}
+  .vs{font-family:"Bebas Neue",sans-serif;font-size:20px;color:var(--ink-dim);letter-spacing:.1em;min-height:24px}
+  .foot{text-align:center;font-size:11px;color:var(--ink-dim);letter-spacing:.14em;text-transform:uppercase}
+
+  @media (prefers-reduced-motion: reduce){
+    .ball,.keeper,.keeper .armL,.keeper .armR{transition:none}
+    .ball.spin svg{animation:none}
+  }
+
+  /* finish effects */
+  .fx{position:fixed;inset:0;z-index:65;pointer-events:none}
+  .fxtext{position:absolute;left:50%;top:34%;transform:translate(-50%,-50%) scale(.4);
+    font-family:"Bebas Neue",sans-serif;font-size:clamp(46px,15vw,104px);letter-spacing:.05em;
+    color:var(--accent-2);text-shadow:0 4px 22px rgba(0,0,0,.55),0 0 30px rgba(255,210,63,.5);
+    opacity:0;z-index:9;pointer-events:none;white-space:nowrap}
+  .fxtext.bad{color:var(--accent);text-shadow:0 4px 22px rgba(0,0,0,.55)}
+  .fxtext.show{animation:fxpop 1.1s cubic-bezier(.2,1.4,.35,1) forwards}
+  @keyframes fxpop{
+    0%{opacity:0;transform:translate(-50%,-50%) scale(.35) rotate(-6deg)}
+    18%{opacity:1;transform:translate(-50%,-50%) scale(1.15) rotate(2deg)}
+    68%{opacity:1;transform:translate(-50%,-50%) scale(1) rotate(0)}
+    100%{opacity:0;transform:translate(-50%,-50%) scale(1.08)}
+  }
+</style>
+</head>
+<body>
+<div class="stage">
+
+  <div class="board">
+    <div class="side you active" id="sideYou">
+      <span class="who" id="whoYou"><span class="flag">🏳️</span>나</span>
+      <span class="score" id="scoreYou">0</span>
+    </div>
+    <div class="center">
+      <span class="label">ROUND</span>
+      <span class="round" id="roundNum">1</span>
+      <span class="sd" id="sdLabel"></span>
+    </div>
+    <div class="side cpu" id="sideCpu">
+      <span class="who" id="whoCpu">상대<span class="flag" style="margin:0 0 0 4px">🏳️</span></span>
+      <span class="score" id="scoreCpu">0</span>
+    </div>
+  </div>
+
+  <div class="tracker">
+    <div class="row you"><span class="tag">나</span><span id="dotsYou" style="display:flex;gap:6px"></span></div>
+    <div class="row cpu"><span id="dotsCpu" style="display:flex;gap:6px"></span><span class="tag" style="text-align:right">상대</span></div>
+  </div>
+
+  <div class="field" id="field">
+    <div class="crowd"></div>
+    <svg class="goal" viewBox="0 0 500 400" preserveAspectRatio="none" aria-hidden="true">
+      <g stroke="var(--net)" stroke-width="6" fill="none" stroke-linecap="round">
+        <rect x="60" y="30" width="380" height="185" rx="4"/>
+      </g>
+      <g stroke="rgba(232,242,238,.16)" stroke-width="1">
+        <path d="M60 30 H440 M60 60 H440 M60 90 H440 M60 120 H440 M60 150 H440 M60 180 H440"/>
+        <path d="M90 30 V215 M120 30 V215 M150 30 V215 M180 30 V215 M210 30 V215 M240 30 V215 M270 30 V215 M300 30 V215 M330 30 V215 M360 30 V215 M390 30 V215 M410 30 V215"/>
+      </g>
+      <path d="M175 360 Q250 320 325 360" stroke="rgba(232,242,238,.25)" stroke-width="2.5" fill="none"/>
+      <circle cx="250" cy="372" r="4" fill="rgba(232,242,238,.4)"/>
+    </svg>
+
+    <div class="keeper" id="keeper">
+      <div class="body">
+        <div class="armL" id="armL"><div class="glove"></div></div>
+        <div class="armR" id="armR"><div class="glove"></div></div>
+        <div class="head">
+          <svg viewBox="0 0 60 70" aria-hidden="true">
+            <path d="M8 34 Q6 8 30 8 Q54 8 52 34 L52 40 Q52 16 30 16 Q8 16 8 40 Z" fill="#241a10"/>
+            <circle cx="9" cy="40" r="5" fill="#f0c199"/><circle cx="51" cy="40" r="5" fill="#f0c199"/>
+            <rect x="12" y="16" width="36" height="44" rx="16" fill="#f3c9a4"/>
+            <path d="M12 32 Q12 12 30 12 Q48 12 48 32 Q40 22 30 22 Q20 22 12 32 Z" fill="#2b1f12"/>
+            <rect x="16" y="31" width="10" height="3" rx="1.5" fill="#241a10"/>
+            <rect x="34" y="31" width="10" height="3" rx="1.5" fill="#241a10"/>
+            <ellipse cx="22" cy="39" rx="3.6" ry="4" fill="#fff"/><ellipse cx="38" cy="39" rx="3.6" ry="4" fill="#fff"/>
+            <circle cx="22" cy="40.5" r="1.9" fill="#20140c"/><circle cx="38" cy="40.5" r="1.9" fill="#20140c"/>
+            <path d="M30 42 L27.5 48 L32.5 48 Z" fill="rgba(0,0,0,.1)"/>
+            <path d="M24 53 Q30 51 36 53" stroke="#8a4234" stroke-width="2" fill="none" stroke-linecap="round"/>
+          </svg>
+        </div>
+        <div class="torso"></div>
+        <div class="legL"></div><div class="legR"></div>
+      </div>
+    </div>
+
+    <div class="kicker" id="kicker">
+      <div class="body">
+        <div class="armL"><div class="armband"></div></div><div class="armR"></div>
+        <div class="head">
+          <svg viewBox="0 0 60 70" aria-hidden="true">
+            <path d="M9 36 Q7 9 30 9 Q53 9 51 36 L51 42 Q51 17 30 17 Q9 17 9 42 Z" fill="#3a2412"/>
+            <circle cx="9" cy="41" r="5" fill="#e6b184"/><circle cx="51" cy="41" r="5" fill="#e6b184"/>
+            <rect x="12" y="17" width="36" height="44" rx="16" fill="#eec19a"/>
+            <path d="M12 33 Q11 13 30 13 Q49 13 48 33 Q44 24 36 23 Q30 21 24 23 Q16 24 12 33 Z" fill="#43290f"/>
+            <rect x="16" y="32" width="10" height="3" rx="1.5" fill="#2e1b0a"/>
+            <rect x="34" y="32" width="10" height="3" rx="1.5" fill="#2e1b0a"/>
+            <ellipse cx="22" cy="40" rx="3.6" ry="4" fill="#fff"/><ellipse cx="38" cy="40" rx="3.6" ry="4" fill="#fff"/>
+            <circle cx="22" cy="41.5" r="1.9" fill="#1c120a"/><circle cx="38" cy="41.5" r="1.9" fill="#1c120a"/>
+            <path d="M30 43 L27.5 49 L32.5 49 Z" fill="rgba(0,0,0,.1)"/>
+            <path d="M25 54 Q30 56 35 54" stroke="#8a4234" stroke-width="2" fill="none" stroke-linecap="round"/>
+          </svg>
+        </div>
+        <div class="torso"></div>
+        <div class="legL"></div><div class="legR"></div>
+      </div>
+    </div>
+
+    <div class="aim" id="aim"></div>
+
+    <div class="ball" id="ball">
+      <svg viewBox="0 0 100 100">
+        <circle cx="50" cy="50" r="46" fill="#fff"/><circle cx="50" cy="50" r="46" fill="none" stroke="#c9d6d0" stroke-width="2"/>
+        <path d="M50 22 L68 36 L61 58 L39 58 L32 36 Z" fill="#12241f"/>
+        <path d="M50 22 L50 8 M68 36 L82 30 M61 58 L70 74 M39 58 L30 74 M32 36 L18 30" stroke="#12241f" stroke-width="4" fill="none" stroke-linecap="round"/>
+      </svg>
+    </div>
+
+    <div class="zones hidden" id="zones">
+      <div class="zone" data-zone="0" tabindex="0"><span class="n">↖</span></div>
+      <div class="zone" data-zone="1" tabindex="0"><span class="n">↑</span></div>
+      <div class="zone" data-zone="2" tabindex="0"><span class="n">↗</span></div>
+      <div class="zone" data-zone="3" tabindex="0"><span class="n">↙</span></div>
+      <div class="zone" data-zone="4" tabindex="0"><span class="n">↓</span></div>
+      <div class="zone" data-zone="5" tabindex="0"><span class="n">↘</span></div>
+    </div>
+
+    <div class="power hidden" id="power">
+      <div class="ptrack"><div class="pfill" id="pfill"></div><div class="pmark" id="pmark"></div></div>
+      <button class="pbtn" id="pbtn">파워 정지</button>
+      <div class="plabel">파워 조절 — 탭 또는 스페이스</div>
+    </div>
+
+    <div class="fxtext" id="fxtext"></div>
+
+    <div class="overlay" id="overlay">
+      <div class="overlay-inner">
+        <h1>승부차기</h1>
+        <div class="modes" id="modes">
+          <button class="modebtn sel" data-mode="exhibition">단판</button>
+          <button class="modebtn" data-mode="tournament">토너먼트</button>
+          <button class="modebtn" data-mode="worldcup">월드컵</button>
+        </div>
+        <span class="pickttl">국가대표를 선택하세요</span>
+        <div class="grid" id="grid"></div>
+        <div class="vs" id="vsline">&nbsp;</div>
+        <button class="btn" id="startBtn" disabled>킥오프</button>
+        <p id="introP">강팀일수록 골키퍼 선방률과 슛 정확도가 높습니다(레이팅 표시). 방향·파워를 정해 차고, 코너를 노릴수록 막기 어렵지만 크로스바·골대 위험도 커집니다.</p>
+      </div>
+    </div>
+  </div>
+
+  <canvas class="fx" id="fx"></canvas>
+
+  <div class="status" id="status">&nbsp;</div>
+  <div class="hint" id="hint">&nbsp;</div>
+  <div class="foot">AIM · POWER · SCORE</div>
+
+</div>
+
+<script>
+(() => {
+  const $ = id => document.getElementById(id);
+  const field=$('field'), zones=$('zones'), ball=$('ball'), keeper=$('keeper'), kicker=$('kicker');
+  const fxCanvas=$('fx'), fxtext=$('fxtext'), fxCtx=fxCanvas.getContext('2d');
+  const armL=$('armL'), armR=$('armR'), status=$('status'), hint=$('hint');
+  const scoreYouEl=$('scoreYou'), scoreCpuEl=$('scoreCpu'), roundNumEl=$('roundNum'), sdLabel=$('sdLabel');
+  const sideYou=$('sideYou'), sideCpu=$('sideCpu'), dotsYou=$('dotsYou'), dotsCpu=$('dotsCpu');
+  const whoYou=$('whoYou'), whoCpu=$('whoCpu');
+  const overlay=$('overlay'), startBtn=$('startBtn'), grid=$('grid'), vsline=$('vsline');
+  const power=$('power'), pfill=$('pfill'), pmark=$('pmark'), pbtn=$('pbtn');
+
+  const COUNTRIES=[
+    {n:'브라질',f:'🇧🇷',kit:'#f2c500',r:91},
+    {n:'아르헨티나',f:'🇦🇷',kit:'#6cb1e1',r:91},
+    {n:'프랑스',f:'🇫🇷',kit:'#20336b',r:91},
+    {n:'스페인',f:'🇪🇸',kit:'#c8102e',r:90},
+    {n:'잉글랜드',f:'🇬🇧',kit:'#efefef',r:89},
+    {n:'포르투갈',f:'🇵🇹',kit:'#b31942',r:88},
+    {n:'독일',f:'🇩🇪',kit:'#e6e6e6',r:88},
+    {n:'네덜란드',f:'🇳🇱',kit:'#ff6a13',r:86},
+    {n:'벨기에',f:'🇧🇪',kit:'#c8102e',r:85},
+    {n:'크로아티아',f:'🇭🇷',kit:'#d61f26',r:84},
+    {n:'우루과이',f:'🇺🇾',kit:'#4a9fd4',r:83},
+    {n:'모로코',f:'🇲🇦',kit:'#c1272d',r:82},
+    {n:'콜롬비아',f:'🇨🇴',kit:'#f4c400',r:82},
+    {n:'스위스',f:'🇨🇭',kit:'#d52b1e',r:80},
+    {n:'멕시코',f:'🇲🇽',kit:'#0a7d3e',r:80},
+    {n:'세네갈',f:'🇸🇳',kit:'#1e824c',r:80},
+    {n:'폴란드',f:'🇵🇱',kit:'#dc143c',r:79},
+    {n:'일본',f:'🇯🇵',kit:'#0b1f6b',r:84},
+    {n:'미국',f:'🇺🇸',kit:'#1c2c6b',r:78},
+    {n:'대한민국',f:'🇰🇷',kit:'#d7202f',r:82},
+    {n:'튀르키예',f:'🇹🇷',kit:'#e30a17',r:77},
+    {n:'스웨덴',f:'🇸🇪',kit:'#1f4e9c',r:77},
+    {n:'에콰도르',f:'🇪🇨',kit:'#f4c400',r:76},
+    {n:'가나',f:'🇬🇭',kit:'#e8e8e8',r:75},
+    {n:'오스트레일리아',f:'🇦🇺',kit:'#f4c400',r:74},
+    {n:'사우디아라비아',f:'🇸🇦',kit:'#0a7d3e',r:72},
+    {n:'이란',f:'🇮🇷',kit:'#d4152b',r:76},
+    {n:'카메룬',f:'🇨🇲',kit:'#0a7d3e',r:75},
+    {n:'이집트',f:'🇪🇬',kit:'#c8102e',r:74},
+    {n:'튀니지',f:'🇹🇳',kit:'#e70013',r:74},
+    {n:'코스타리카',f:'🇨🇷',kit:'#c8102e',r:73},
+    {n:'카타르',f:'🇶🇦',kit:'#8a1538',r:71},
+    {n:'노르웨이',f:'🇳🇴',kit:'#ba0c2f',r:86},
+    {n:'파라과이',f:'🇵🇾',kit:'#d52b1e',r:74},
+    {n:'남아공',f:'🇿🇦',kit:'#007749',r:73},
+    {n:'쿠라소',f:'🇨🇼',kit:'#003d99',r:68},
+    {n:'체코',f:'🇨🇿',kit:'#c8102e',r:77},
+    {n:'캐나다',f:'🇨🇦',kit:'#d52b1e',r:75},
+    {n:'보스니아',f:'🇧🇦',kit:'#1f4e9c',r:74},
+    {n:'카보베르데',f:'🇨🇻',kit:'#0a3b7c',r:71},
+    {n:'우크라이나',f:'🇺🇦',kit:'#f4c400',r:77},
+    {n:'코트디부아르',f:'🇨🇮',kit:'#ff7a00',r:76},
+    {n:'우즈베키스탄',f:'🇺🇿',kit:'#0a7fd4',r:73},
+    {n:'콩고민주공화국',f:'🇨🇩',kit:'#1e6fc4',r:73},
+    {n:'이라크',f:'🇮🇶',kit:'#1e824c',r:72},
+    {n:'파나마',f:'🇵🇦',kit:'#c8102e',r:71},
+    {n:'뉴질랜드',f:'🇳🇿',kit:'#e8e8e8',r:70},
+    {n:'아이티',f:'🇭🇹',kit:'#1a3d8f',r:68},
+  ];
+  // skill 0..1 from rating
+  const RMIN=72, RMAX=91;
+  const sk = c => Math.max(0, Math.min(1, (c.r-RMIN)/(RMAX-RMIN)));
+  // nemesis (약점): a team plays weaker against its listed opponent.
+  // Argentina, France, Spain, Norway have none. Brazil's weakness is Norway.
+  const WEAK={
+    '브라질':'노르웨이','잉글랜드':'독일','포르투갈':'스페인','독일':'체코',
+    '네덜란드':'아르헨티나','벨기에':'프랑스','크로아티아':'프랑스','우루과이':'가나','모로코':'프랑스',
+    '콜롬비아':'잉글랜드','스위스':'스페인','멕시코':'아르헨티나','세네갈':'네덜란드',
+    '폴란드':'세네갈','일본':'벨기에','미국':'네덜란드','대한민국':'우루과이',
+    '튀르키예':'브라질','스웨덴':'벨기에','에콰도르':'잉글랜드','가나':'우루과이',
+    '오스트레일리아':'아르헨티나','사우디아라비아':'폴란드','이란':'스페인',
+    '카메룬':'브라질','이집트':'잉글랜드','튀니지':'프랑스','코스타리카':'독일','카타르':'네덜란드',
+    '파라과이':'스페인','남아공':'프랑스','쿠라소':'브라질','체코':'독일','캐나다':'벨기에',
+    '보스니아':'아르헨티나','카보베르데':'포르투갈','우크라이나':'잉글랜드','코트디부아르':'브라질',
+    '우즈베키스탄':'일본','콩고민주공화국':'모로코','이라크':'대한민국','파나마':'잉글랜드',
+    '뉴질랜드':'프랑스','아이티':'브라질'
+  };
+  const WEAK_DEBUFF=8;
+  const effR=(team,opp)=> team.r - ((opp && WEAK[team.n]===opp.n) ? WEAK_DEBUFF : 0);
+  const skVs=(team,opp)=> Math.max(0, Math.min(1, (effR(team,opp)-RMIN)/(RMAX-RMIN)));
+  // team-specific goalkeeper bonus (added to save probability when defending)
+  const GK_BONUS={'카보베르데':0.25,'가나':0.10};
+  const gkBonus=team=> (team && GK_BONUS[team.n]) || 0;
+
+  // zone grid  0 1 2 / 3 4 5
+  const zonePos=[{x:-26,y:-72},{x:0,y:-78},{x:26,y:-72},{x:-30,y:-46},{x:0,y:-50},{x:30,y:-46}];
+  // fixed goal-mouth targets (% of field) matching the 6 aim zones
+  const ZONECEN=[{x:24,y:20},{x:50,y:18},{x:76,y:20},{x:24,y:44},{x:50,y:46},{x:76,y:44}];
+  const aim=$('aim');
+  function aimAt(zone){ const t=ZONECEN[zone]; aim.style.left=t.x+'%'; aim.style.top=t.y+'%'; aim.classList.add('show'); }
+  function hideAim(){ aim.classList.remove('show'); }
+  const keeperMove=[{dx:-70,by:52,arm:'high'},{dx:0,by:58,arm:'high'},{dx:70,by:52,arm:'high'},
+                    {dx:-64,by:20,arm:'low'},{dx:0,by:30,arm:'mid'},{dx:64,by:20,arm:'low'}];
+  const CORNERS=new Set([0,2,3,5]);
+  const NEIGH={0:[1,3],1:[0,2,4],2:[1,5],3:[0,4],4:[1,3,5],5:[2,4]};
+  const TOTAL=5;
+
+  let me=null, opp=null, state=null;
+  let selIdx=-1;
+  let mode='exhibition', tour=null;
+  const modesEl=$('modes'), introP=$('introP');
+
+  // ---- mode toggle ----
+  modesEl.addEventListener('click',e=>{
+    const b=e.target.closest('.modebtn'); if(!b) return;
+    mode=b.dataset.mode;
+    [...modesEl.children].forEach(el=>el.classList.toggle('sel',el===b));
+    startBtn.textContent = mode==='worldcup' ? '월드컵 시작' : mode==='tournament' ? '토너먼트 시작' : '킥오프';
+    introP.textContent =
+      mode==='worldcup' ? '48개국 월드컵! 12개 조(A~L) 조별리그 후 각 조 2위 + 3위 중 상위 8팀이 32강에 진출합니다. 내 경기만 직접 뛰고 나머지는 자동 진행돼요.'
+      : mode==='tournament' ? '16개국 토너먼트! 16강·8강·4강·결승을 승부차기로 뚫고 우승하세요. 다른 경기는 팀 전력에 따라 자동 진행됩니다.'
+      : '강팀일수록 골키퍼 선방률과 슛 정확도가 높습니다(레이팅 표시). 방향·파워를 정해 차고, 코너를 노릴수록 막기 어렵지만 크로스바·골대 위험도 커집니다.';
+    if(me) refreshVs();
+  });
+  function refreshVs(){
+    vsline.innerHTML =
+      mode==='worldcup' ? `${me.f} ${me.n} <span style="opacity:.6">· 48개국 월드컵</span>`
+      : mode==='tournament' ? `${me.f} ${me.n} <span style="opacity:.6">· 16개국 토너먼트</span>`
+      : `${me.f} ${me.n} <b>${me.r}</b> <span style="opacity:.6">VS</span> <b>${opp.r}</b> ${opp.n} ${opp.f}`;
+  }
+
+  // ---- country picker ----
+  function buildGrid(){
+    grid.innerHTML='';
+    COUNTRIES.forEach((c,i)=>{
+      const b=document.createElement('button');
+      b.className='flagbtn'; b.type='button';
+      b.innerHTML=`<span class="f">${c.f}</span><span class="cn">${c.n}</span><span class="rt">${c.r}</span>`;
+      b.addEventListener('click',()=>{
+        selIdx=i;
+        [...grid.children].forEach((el,j)=>el.classList.toggle('sel',j===i));
+        // random distinct opponent (used for single match)
+        let o; do{o=Math.floor(Math.random()*COUNTRIES.length)}while(o===i);
+        me=COUNTRIES[i]; opp=COUNTRIES[o];
+        refreshVs();
+        startBtn.disabled=false;
+      });
+      grid.appendChild(b);
+    });
+  }
+
+  function setKeeperKit(hex){ document.documentElement.style.setProperty('--keeper-kit',hex); }
+  function setKickerKit(hex){ document.documentElement.style.setProperty('--kicker-kit',hex); }
+
+  // ---- finish effects ----
+  const DPR=Math.min(2,window.devicePixelRatio||1);
+  function sizeFx(){ fxCanvas.width=innerWidth*DPR; fxCanvas.height=innerHeight*DPR; fxCtx.setTransform(DPR,0,0,DPR,0,0); }
+  addEventListener('resize',sizeFx); sizeFx();
+  let confetti=[], confRAF=null;
+  function confTick(){
+    fxCtx.clearRect(0,0,innerWidth,innerHeight);
+    confetti.forEach(p=>{ p.vy+=0.28; p.x+=p.vx; p.y+=p.vy; p.vx*=0.99; p.rot+=p.vr; });
+    confetti=confetti.filter(p=>p.y<innerHeight+50);
+    confetti.forEach(p=>{ fxCtx.save(); fxCtx.translate(p.x,p.y); fxCtx.rotate(p.rot);
+      fxCtx.fillStyle=p.c; fxCtx.fillRect(-p.s/2,-p.s/2,p.s,p.s*0.62); fxCtx.restore(); });
+    if(confetti.length) confRAF=requestAnimationFrame(confTick);
+    else { confRAF=null; fxCtx.clearRect(0,0,innerWidth,innerHeight); }
+  }
+  function burst(n,x,y,colors,spread){
+    for(let i=0;i<n;i++) confetti.push({x,y,
+      vx:(Math.random()-.5)*(spread||9), vy:Math.random()*-11-4,
+      rot:Math.random()*6, vr:(Math.random()-.5)*.4, s:5+Math.random()*7,
+      c:colors[i%colors.length]});
+    if(!confRAF) confTick();
+  }
+  function popText(txt,bad){
+    fxtext.textContent=txt; fxtext.classList.toggle('bad',!!bad);
+    fxtext.classList.remove('show'); void fxtext.offsetWidth; fxtext.classList.add('show');
+  }
+  const SIG={'프랑스':'cross','포르투갈':'siuu','아르헨티나':'sky'};
+  const SIG_LABEL={cross:'팔짱 세리머니',siuu:'점프 세리머니',sky:'하늘을 향한 세리머니'};
+  function celebrateCaptain(big,sig){
+    kicker.classList.remove('celebrate','big','sig','sig-cross','sig-siuu','sig-sky'); void kicker.offsetWidth;
+    if(sig){
+      kicker.classList.add('sig','sig-'+sig);
+      setTimeout(()=>kicker.classList.remove('sig','sig-'+sig),1750);
+    } else {
+      kicker.classList.add('celebrate'); if(big) kicker.classList.add('big');
+      setTimeout(()=>kicker.classList.remove('celebrate','big'), big?1800:1200);
+    }
+  }
+  function goalCelebrate(){
+    const r=field.getBoundingClientRect();
+    const cx=r.left+r.width/2, cy=r.top+r.height*0.32;
+    const cols=[me?me.kit:'#ff5b3d','#ffd23f','#ffffff','#3fd07a','#ff5b3d'];
+    burst(46,cx,cy,cols,10);
+    celebrateCaptain(false);
+    popText('GOAL!');
+  }
+  function playFinish(win,draw){
+    if(win){
+      setKickerKit(me.kit);
+      const sig=SIG[me.n];
+      celebrateCaptain(true, sig);
+      const cols=[me?me.kit:'#ff5b3d','#ffd23f','#ffffff','#3fd07a','#5bd0ff'];
+      burst(90,innerWidth*0.2,innerHeight*0.78,cols,10);
+      burst(90,innerWidth*0.8,innerHeight*0.78,cols,10);
+      setTimeout(()=>burst(70,innerWidth*0.5,innerHeight*0.55,cols,12),260);
+      popText('WIN!');
+      if(sig) setTimeout(()=>popText(SIG_LABEL[sig]),800);
+    } else if(draw){
+      popText('DRAW');
+    } else {
+      popText('FINISH',true);
+    }
+  }
+
+  function setBoardTeams(){
+    whoYou.innerHTML=`<span class="flag">${me.f}</span>${me.n}`;
+    whoCpu.innerHTML=`${opp.n}<span class="flag" style="margin:0 0 0 4px">${opp.f}</span>`;
+  }
+
+  // ---- state ----
+  function reset(){
+    state={round:1,phase:'shoot',you:0,cpu:0,youShots:[],cpuShots:[],
+      youZones:[],oppZones:[],suddenDeath:false,busy:false,over:false,groupMatch:false};
+    setBoardTeams(); renderScore(); renderDots(); keeperReset(); ballReset();
+  }
+  function renderScore(){
+    scoreYouEl.textContent=state.you; scoreCpuEl.textContent=state.cpu;
+    roundNumEl.textContent=state.suddenDeath?state.round:Math.min(state.round,TOTAL);
+    sdLabel.textContent=state.suddenDeath?'SUDDEN DEATH':'';
+    sideYou.classList.toggle('active',state.phase==='shoot');
+    sideCpu.classList.toggle('active',state.phase==='keep');
+  }
+  function makeDots(arr,max){let h='';for(let i=0;i<max;i++){const v=arr[i];
+    h+=`<span class="${v==='goal'?'dot goal':v==='miss'?'dot miss':'dot'}"></span>`;}return h;}
+  function renderDots(){
+    const max=state.suddenDeath?Math.max(TOTAL,state.youShots.length,state.cpuShots.length):TOTAL;
+    dotsYou.innerHTML=makeDots(state.youShots,max); dotsCpu.innerHTML=makeDots(state.cpuShots,max);
+  }
+
+  function keeperReset(){keeper.style.transform='translateX(-50%)';keeper.style.bottom='30%';
+    armL.style.transform='';armR.style.transform='';}
+  function keeperDive(z){const m=keeperMove[z];
+    keeper.style.transform=`translateX(calc(-50% + ${m.dx}%)) rotate(${m.dx<0?-14:m.dx>0?14:0}deg)`;
+    keeper.style.bottom=m.by+'%';
+    if(m.arm==='high'){armL.style.transform='rotate(-140deg)';armR.style.transform='rotate(140deg)';}
+    else if(m.arm==='low'){armL.style.transform='rotate(-40deg)';armR.style.transform='rotate(40deg)';}
+    else{armL.style.transform='rotate(-90deg)';armR.style.transform='rotate(90deg)';}}
+  function ballReset(){ball.classList.remove('spin');ball.style.width='9%';ball.style.left='50%';ball.style.top='86%';hideAim();}
+
+  function animateBall(zone,result,guess){
+    ball.classList.add('spin');
+    const t=ZONECEN[zone];
+    let x=t.x,y=t.y,w='5%';
+    if(result==='goal'){ x=t.x; y=t.y; }                               // exact spot
+    else if(result==='save'){ x=50+(t.x-50)*0.82; y=t.y+7; w='5.5%'; }  // stopped by keeper
+    else if(result==='over'){ x=t.x; y=-8; w='3.4%'; }                  // over the bar
+    else { x=t.x<50?5:95; y=t.y; w='4%'; }                              // post / wide
+    ball.style.width=w; ball.style.left=x+'%'; ball.style.top=y+'%';
+  }
+  function say(m,s){status.innerHTML=m||'&nbsp;';hint.innerHTML=s||'&nbsp;';}
+
+  // ---- power meter ----
+  let powerRAF=null,powerVal=0,powerDir=1,powerCb=null;
+  function showPower(v){power.classList.toggle('hidden',!v);}
+  function startPower(cb){
+    powerCb=cb;powerVal=8;powerDir=1;showPower(true);
+    const step=()=>{powerVal+=powerDir*2.4;
+      if(powerVal>=100){powerVal=100;powerDir=-1;}
+      if(powerVal<=0){powerVal=0;powerDir=1;}
+      pfill.style.width=powerVal+'%';pmark.style.left=powerVal+'%';
+      powerRAF=requestAnimationFrame(step);};
+    step();
+  }
+  function lockPower(){
+    if(!powerCb)return;cancelAnimationFrame(powerRAF);showPower(false);
+    const v=Math.round(powerVal),cb=powerCb;powerCb=null;cb(v);
+  }
+  pbtn.addEventListener('click',lockPower);
+
+  // ---- outcome model ----
+  // keeperSk / shooterSk are 0..1 skill of the defending/attacking team
+  function resolve(zone,power,guess,keeperSk,shooterSk,gkB){
+    const top=zone<3;
+    // skilled shooters skie/pull it far less often
+    if(top){let overP=power>86?(power-86)/14*0.55:0;overP*=(1-shooterSk*0.65);
+      if(Math.random()<overP)return'over';}
+    if(CORNERS.has(zone)){let wideP=power>93?(power-93)/7*0.30:0;wideP*=(1-shooterSk*0.65);
+      if(Math.random()<wideP)return'post';}
+    const exact=guess===zone, adj=NEIGH[zone].includes(guess);
+    let s=0;
+    if(exact){s=(CORNERS.has(zone)?0.50:0.74)-(power-50)*0.0045;
+      // elite shooters place corners out of reach even on a correct guess
+      if(CORNERS.has(zone)) s-=shooterSk*(power/100)*0.30;}
+    else if(adj) s=0.30-power*0.0035;
+    else s=power<20?0.15:0.02;
+    if(power<22) s+=0.25;
+    // keeper skill: overall save lift + extra reflex on near-misses
+    s+=keeperSk*0.18;
+    if(adj) s+=keeperSk*0.10;
+    s+=(gkB||0); // team-specific goalkeeper bonus
+    s=Math.max(0,Math.min(0.97,s));
+    return Math.random()<s?'save':'goal';
+  }
+
+  // ---- AI ----
+  function weightedPick(w){const sum=w.reduce((a,b)=>a+b,0);let r=Math.random()*sum;
+    for(let i=0;i<w.length;i++){if((r-=w[i])<0)return i;}return w.length-1;}
+  function keeperGuess(skill){ // reads your repeated zones; stronger keeper reads harder
+    const w=[1.1,1,1.1,1.2,.8,1.2];
+    state.youZones.forEach(z=>w[z]+=0.4+skill*0.5);
+    return weightedPick(w);
+  }
+  function aiShotZone(skill){ // stronger teams aim corners more
+    const w=[1.3,.7,1.3,1.2,.6,1.2];
+    for(let i=0;i<6;i++){ if(CORNERS.has(i))w[i]+=skill*0.9; else w[i]=Math.max(.15,w[i]-skill*0.3); }
+    return weightedPick(w);
+  }
+  function aiShotPower(skill){ // stronger teams flub less and strike cleaner
+    const flub=0.15*(1-skill*0.85);
+    if(Math.random()<flub)return Math.round(Math.random()*40);
+    return Math.round((54+skill*12)+Math.random()*32);
+  }
+
+  function showZones(v){zones.classList.toggle('hidden',!v);}
+
+  // ---- YOU SHOOT ----
+  function beginShoot(){
+    state.phase='shoot';setKeeperKit(opp.kit);setKickerKit(me.kit);renderScore();keeperReset();ballReset();
+    let sub=state.enteredSD?'서든데스! 이 라운드부터 먼저 앞서가면 그대로 승리입니다.':'코너일수록 막기 어렵지만 빗나갈 위험도 커집니다.';
+    state.enteredSD=false;
+    if(state.youShots.length===0 && !state.suddenDeath){
+      if(WEAK[me.n]===opp.n) sub=`⚠️ ${opp.n}은(는) 우리 팀 천적 — 이번 경기 우리가 약체화됩니다.`;
+      else if(WEAK[opp.n]===me.n) sub=`💪 우리 팀이 ${opp.n}의 천적 — 상대가 약체화됩니다.`;
+    }
+    showZones(true);say(`${me.f} 노릴 구역을 선택하세요`,sub);
+  }
+  function doShoot(zone){
+    state.busy=true;aimAt(zone);showZones(false);
+    startPower(power=>{
+      state.youZones.push(zone);if(state.youZones.length>4)state.youZones.shift();
+      const guess=keeperGuess(skVs(opp,me));
+      const res=resolve(zone,power,guess,skVs(opp,me),skVs(me,opp),gkBonus(opp));
+      keeperDive(guess);animateBall(zone,res,guess);
+      setTimeout(()=>{
+        if(res==='goal'){state.you++;state.youShots.push('goal');
+          goalCelebrate();
+          say('<span class="cool">골!</span> 그물을 흔들었습니다',power>85?'강력한 슛이 꽂혔어요.':'코스가 완벽했어요.');}
+        else if(res==='save'){state.youShots.push('miss');
+          say('<span class="bad">선방!</span> 골키퍼가 막았습니다','방향을 읽혔어요.');}
+        else if(res==='over'){state.youShots.push('miss');
+          say('<span class="bad">크로스바 위!</span> 하늘로 날아갔습니다','파워가 너무 셌어요.');}
+        else{state.youShots.push('miss');
+          say('<span class="bad">골대 밖!</span> 코너를 놓쳤습니다','조금만 안쪽으로.');}
+        renderScore();renderDots();state.busy=false;afterShot();
+      },640);
+    });
+  }
+
+  // ---- YOU KEEP ----
+  function beginKeep(){
+    state.phase='keep';setKeeperKit(me.kit);setKickerKit(opp.kit);renderScore();keeperReset();ballReset();
+    showZones(true);say(`${opp.f} 막을 방향으로 다이빙`,'상대가 찰 구역을 예측하세요. 정확히 읽으면 선방!');
+  }
+  function doKeep(dive){
+    state.busy=true;showZones(false);
+    const zone=aiShotZone(skVs(opp,me)),power=aiShotPower(skVs(opp,me));
+    state.oppZones.push(zone);
+    const res=resolve(zone,power,dive,skVs(me,opp),skVs(opp,me),gkBonus(me));
+    keeperDive(dive);
+    setTimeout(()=>{aimAt(zone);animateBall(zone,res,dive);},120);
+    setTimeout(()=>{
+      if(res==='goal'){state.cpu++;state.cpuShots.push('goal');
+        say('<span class="bad">실점</span> 반대쪽으로 갔습니다','방향이 엇갈렸어요.');}
+      else if(res==='save'){state.cpuShots.push('miss');
+        popText('SAVE!');
+        say('<span class="cool">선방!</span> 방향을 정확히 읽었습니다','멋진 예측이었어요.');}
+      else if(res==='over'){state.cpuShots.push('miss');
+        say('<span class="cool">크로스바 위!</span> 상대가 실축했습니다','운이 따랐네요.');}
+      else{state.cpuShots.push('miss');
+        say('<span class="cool">골대 밖!</span> 상대가 빗맞혔습니다','기회를 살리세요.');}
+      renderScore();renderDots();state.busy=false;afterShot();
+    },760);
+  }
+
+  // ---- flow ----
+  function afterShot(){
+    if(checkDecided()){setTimeout(endGame,900);return;}
+    setTimeout(()=>{ballReset();keeperReset();
+      if(state.phase==='shoot'){beginKeep();}
+      else{state.round++;
+        if(!state.suddenDeath&&!state.groupMatch&&state.round>TOTAL){state.suddenDeath=true;state.round=1;state.enteredSD=true;renderDots();}
+        beginShoot();}
+    },1100);
+  }
+  function checkDecided(){
+    const y=state.youShots.length,c=state.cpuShots.length;
+    if(!state.suddenDeath){
+      if(state.you-state.cpu>TOTAL-c)return true;
+      if(state.cpu-state.you>TOTAL-y)return true;
+      // all 10 taken: group matches end level (draw); elsewhere a tie goes to sudden death
+      if(y>=TOTAL&&c>=TOTAL) return state.groupMatch ? true : state.you!==state.cpu;
+      return false;
+    }
+    if(y===c&&y>=TOTAL)return state.you!==state.cpu;
+    return false;
+  }
+  function endGame(){
+    state.over=true;showZones(false);showPower(false);
+    const win=state.you>state.cpu;
+    const draw=state.groupMatch && state.you===state.cpu;
+    playFinish(win,draw);
+    const showResult=()=>{
+      if(mode==='tournament'||mode==='worldcup'){ onMatchEnd(win,draw); return; }
+      overlay.classList.remove('hidden');
+      overlay.innerHTML=`
+        <div class="overlay-inner">
+          <h1>${win?'승리':'패배'}</h1>
+          <div class="res">${me.f} ${state.you} : ${state.cpu} ${opp.f}</div>
+          <p>${win?me.n+' 대표팀이 승부차기를 지배했습니다. 그물이 계속 흔들렸네요.':'다음엔 코스와 파워의 균형을 노려보세요. 방향 읽기가 관건입니다.'}</p>
+          <button class="btn" id="againBtn">다시 하기</button>
+          <button class="btn" id="teamBtn" style="background:transparent;box-shadow:none;border:1px solid var(--line)">팀 다시 고르기</button>
+        </div>`;
+      $('againBtn').addEventListener('click',()=>{overlay.classList.add('hidden');reset();beginShoot();});
+      $('teamBtn').addEventListener('click',()=>{location.reload();});
+    };
+    setTimeout(showResult, win?1900:700);
+  }
+
+  // ---- TOURNAMENT ----
+  const ROUND_NAMES={32:'32강',16:'16강',8:'8강',4:'4강',2:'결승'};
+  function shuffle(a){for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];}return a;}
+  function randScore(){const o=[[5,4],[5,3],[4,3],[4,2],[5,2],[3,2],[6,5],[4,1],[3,1]];return o[Math.floor(Math.random()*o.length)];}
+  function simMatch(a,b,allowDraw){
+    const diff=(effR(a,b)+gkBonus(a)*40)-(effR(b,a)+gkBonus(b)*40); // GK bonus ~ rating boost in shootout sims
+    const pA=0.5+Math.max(-0.34,Math.min(0.34,diff*0.012));
+    if(allowDraw && Math.random()<0.26){ const s=[1,2,2,3][Math.floor(Math.random()*4)]; return {winner:null, draw:true, score:[s,s]}; }
+    const aWin=Math.random()<pA;
+    const [w,l]=randScore();
+    return {winner:aWin?a:b, score:aWin?[w,l]:[l,w]};
+  }
+  function seedTournament(){
+    const pool=shuffle(COUNTRIES.filter(c=>c!==me)).slice(0,15);
+    const rest=shuffle(pool.slice());
+    const seeded=[me,...rest]; // 16 teams, player at slot 0
+    const r16=[];
+    for(let i=0;i<16;i+=2) r16.push({a:seeded[i],b:seeded[i+1],winner:null,score:null,played:false});
+    tour={teams:seeded, rounds:[r16], ri:0, stage:'knockout', format:'knockout'};
+  }
+  function playerMatch(){const rd=tour.rounds[tour.ri];return rd.find(m=>m.a===me||m.b===me);}
+  function playerNextOpp(){const m=playerMatch();return m.a===me?m.b:m.a;}
+  function buildNextRound(){
+    const cur=tour.rounds[tour.ri],next=[];
+    for(let i=0;i<cur.length;i+=2) next.push({a:cur[i].winner,b:cur[i+1].winner,winner:null,score:null,played:false});
+    tour.rounds.push(next);
+  }
+  function simRestToChampion(){
+    let ri=tour.ri;
+    tour.rounds[ri].forEach(m=>{if(!m.played){const r=simMatch(m.a,m.b);m.winner=r.winner;m.score=r.score;m.played=true;}});
+    while(tour.rounds[ri].length>1){
+      const cur=tour.rounds[ri],next=[];
+      for(let i=0;i<cur.length;i+=2){const r=simMatch(cur[i].winner,cur[i+1].winner);
+        next.push({a:cur[i].winner,b:cur[i+1].winner,winner:r.winner,score:r.score,played:true});}
+      tour.rounds.push(next);ri++;
+    }
+    return tour.rounds[ri][0].winner;
+  }
+  function onMatchEnd(win,draw){
+    if(tour.stage==='group') onGroupMatchEnd(win,draw);
+    else onKnockoutMatchEnd(win);
+  }
+  function onKnockoutMatchEnd(win){
+    const pm=playerMatch();
+    pm.winner=win?me:opp; pm.played=true;
+    pm.score=(pm.a===me)?[state.you,state.cpu]:[state.cpu,state.you];
+    const rd=tour.rounds[tour.ri];
+    rd.forEach(m=>{if(!m.played){const r=simMatch(m.a,m.b);m.winner=r.winner;m.score=r.score;m.played=true;}});
+    if(!win){ const champ=simRestToChampion(); showBracket('eliminated',champ); return; }
+    if(rd.length===1){ showBracket('champion',me); return; }
+    buildNextRound(); tour.ri++;
+    showBracket('advance');
+  }
+
+  // ---- WORLD CUP (group stage + knockout) ----
+  function makeGroup(name,t){
+    const mk=(x,y)=>({a:t[x],b:t[y],winner:null,score:null,played:false});
+    const mds=[[mk(0,1),mk(2,3)],[mk(0,2),mk(3,1)],[mk(0,3),mk(1,2)]];
+    return {name,teams:t.slice(),mds};
+  }
+  function seedWorldCup(){
+    const others=shuffle(COUNTRIES.filter(c=>c!==me)).slice(0,47);
+    const names=['A','B','C','D','E','F','G','H','I','J','K','L'];
+    const groups=[makeGroup('A',[me,...others.slice(0,3)])];
+    for(let g=1;g<12;g++){ const s=3+(g-1)*4; groups.push(makeGroup(names[g],others.slice(s,s+4))); }
+    tour={format:'worldcup',stage:'group',groupRound:0,groups,rounds:[],ri:0};
+  }
+  function simGroupMatch(m){ if(m.played)return; const r=simMatch(m.a,m.b,true); m.winner=r.winner;m.draw=r.draw;m.score=r.score;m.played=true; }
+  function standings(g){
+    const rows=g.teams.map(t=>({team:t,pl:0,w:0,l:0,gf:0,ga:0,pts:0,gd:0}));
+    const find=t=>rows.find(r=>r.team===t);
+    g.mds.flat().forEach(m=>{ if(!m.played)return;
+      const ra=find(m.a),rb=find(m.b);
+      ra.pl++;rb.pl++; ra.gf+=m.score[0];ra.ga+=m.score[1]; rb.gf+=m.score[1];rb.ga+=m.score[0];
+      if(m.winner===m.a){ra.w++;ra.pts+=3;rb.l++;}
+      else if(m.winner===m.b){rb.w++;rb.pts+=3;ra.l++;}
+      else {ra.pts++;rb.pts++;}
+    });
+    rows.forEach(r=>r.gd=r.gf-r.ga);
+    rows.sort((x,y)=>y.pts-x.pts||y.gd-x.gd||y.gf-x.gf||y.team.r-x.team.r);
+    return rows;
+  }
+  // scenario math for the player's group going into the final matchday
+  function groupBaseStats(g){
+    const m=new Map(); g.teams.forEach(t=>m.set(t,{pts:0,gd:0,gf:0}));
+    g.mds.flat().forEach(x=>{ if(!x.played)return;
+      const A=m.get(x.a),B=m.get(x.b);
+      A.gf+=x.score[0];A.gd+=x.score[0]-x.score[1];
+      B.gf+=x.score[1];B.gd+=x.score[1]-x.score[0];
+      if(x.winner===x.a)A.pts+=3; else if(x.winner===x.b)B.pts+=3; else {A.pts++;B.pts++;}
+    });
+    return m;
+  }
+  function scenarioLines(){
+    const pg=tour.groups[0], md=2;
+    const pm=pg.mds[md][0], om=pg.mds[md][1];
+    if(pm.played) return null;
+    const A=pm.a===me?pm.b:pm.a; // my final-match opponent
+    const B=om.a, C=om.b;        // the other match in my group
+    const base=groupBaseStats(pg);
+    const otherThirds=tour.groups.slice(1).map(g=>{const r=standings(g)[2];return {team:r.team,pts:r.pts,gd:r.gd,gf:r.gf};});
+    const NEED_FAV=4;
+    const beats=(a,b)=> a.pts!==b.pts ? a.pts>b.pts : a.gd!==b.gd ? a.gd>b.gd : a.gf!==b.gf ? a.gf>b.gf : me.r>b.team.r;
+    // pRes: 'W'|'D'|'L' (my match vs A), oRes: 'A'|'D'|'B' (other match B vs C)
+    function place(pRes,oRes){
+      const t=new Map(); pg.teams.forEach(x=>{const b=base.get(x);t.set(x,{team:x,pts:b.pts,gd:b.gd,gf:b.gf});});
+      if(pRes==='W')t.get(me).pts+=3; else if(pRes==='D'){t.get(me).pts++;t.get(A).pts++;} else t.get(A).pts+=3;
+      if(oRes==='A')t.get(B).pts+=3; else if(oRes==='D'){t.get(B).pts++;t.get(C).pts++;} else t.get(C).pts+=3;
+      const arr=[...t.values()].sort((x,y)=>y.pts-x.pts||y.gd-x.gd||y.gf-x.gf||y.team.r-x.team.r);
+      const rank=arr.findIndex(e=>e.team===me);
+      return {rank, my:arr[rank]};
+    }
+    function adv(pRes,oRes){ // returns true if I qualify (top2 or wildcard)
+      const p=place(pRes,oRes);
+      if(p.rank<=1) return true;
+      if(p.rank===2) return otherThirds.filter(o=>beats(p.my,o)).length>=NEED_FAV;
+      return false;
+    }
+    function line(pRes,label){
+      const rA=adv(pRes,'A'), rD=adv(pRes,'D'), rB=adv(pRes,'B');
+      if(rA&&rD&&rB) return `${label} → 진출`;
+      if(!rA&&!rD&&!rB) return `${label} → 탈락`;
+      const yes=[]; if(rA)yes.push(`${B.n} 승`); if(rD)yes.push('무승부'); if(rB)yes.push(`${C.n} 승`);
+      return `${label} → 다른 경기 ${yes.join('/')} 시 진출, 아니면 탈락`;
+    }
+    const curRank=standings(pg).findIndex(r=>r.team===me);
+    const lines=[line('W','이기면'), line('D','비기면'), line('L','지면')];
+    const anyThird=['W','D','L'].some(p=>['A','D','B'].some(o=>place(p,o).rank===2));
+    if(anyThird) lines.push(`※ 와일드카드: 각 조 3위 12팀 중 상위 8팀 진출 (다른 조 3위 ${NEED_FAV}팀 이상 앞서면 통과)`);
+    return {curRank, lines};
+  }
+  function buildKnockoutFromGroups(){
+    const tables=tour.groups.map(standings);
+    const firsts=tables.map(t=>t[0]);
+    const seconds=tables.map(t=>t[1]);
+    const bestThirds=tables.map(t=>t[2])
+      .sort((x,y)=>y.pts-x.pts||y.gd-x.gd||y.gf-x.gf||y.team.r-x.team.r).slice(0,8);
+    const pool=[...firsts,...seconds,...bestThirds]
+      .sort((x,y)=>y.pts-x.pts||y.gd-x.gd||y.gf-x.gf||y.team.r-x.team.r);
+    const teams=pool.map(r=>r.team); // 32 seeded strongest -> weakest
+    const r32=[];
+    for(let i=0;i<16;i++) r32.push({a:teams[i],b:teams[31-i],winner:null,score:null,played:false});
+    tour.rounds=[r32]; tour.ri=0; tour.stage='knockout';
+    tour.thirdQualified=bestThirds.map(r=>r.team);
+  }
+  function onGroupMatchEnd(win,draw){
+    const md=tour.groupRound, pg=tour.groups[0];
+    const pm=pg.mds[md][0];
+    if(draw){ pm.winner=null; pm.draw=true; }
+    else { pm.winner=win?me:opp; }
+    pm.played=true;
+    pm.score=(pm.a===me)?[state.you,state.cpu]:[state.cpu,state.you];
+    simGroupMatch(pg.mds[md][1]);
+    for(let g=1;g<tour.groups.length;g++) tour.groups[g].mds[md].forEach(simGroupMatch);
+    tour.groupRound++;
+    if(tour.groupRound<3){ showGroupStage(); return; }
+    buildKnockoutFromGroups();
+    const meQual=tour.rounds[0].some(m=>m.a===me||m.b===me);
+    if(!meQual){ const champ=simRestToChampion(); showGroupResult('eliminated',champ); return; }
+    showGroupResult('passed');
+  }
+  function groupsHTML(showQual){
+    let h='<div class="groups">';
+    tour.groups.forEach(g=>{
+      h+=`<div class="grp"><div class="grp-h">GROUP ${g.name}</div>`;
+      h+=`<div class="grow ghead"><span class="pos">#</span><span class="tf"></span><span class="tn"></span><span class="st">경</span><span class="st">승</span><span class="st gd">±</span><span class="st pts">점</span></div>`;
+      standings(g).forEach((r,i)=>{
+        const cls=['grow']; if(r.team===me)cls.push('meRow');
+        const wild = i===2 && tour.thirdQualified && tour.thirdQualified.includes(r.team);
+        if(showQual && (i<2 || wild)){ cls.push('qual'); if(wild) cls.push('wild'); }
+        h+=`<div class="${cls.join(' ')}"><span class="pos">${i+1}</span><span class="tf">${r.team.f}</span>`
+          +`<span class="tn">${r.team.n}${wild?' <b class="wc">WC</b>':''}</span><span class="st">${r.pl}</span><span class="st">${r.w}</span>`
+          +`<span class="st gd">${r.gd>0?'+':''}${r.gd}</span><span class="st pts">${r.pts}</span></div>`;
+      });
+      h+='</div>';
+    });
+    return h+'</div>';
+  }
+  function showGroupStage(){
+    overlay.classList.remove('hidden');
+    const md=tour.groupRound, pm=tour.groups[0].mds[md][0];
+    // On the final matchday, resolve every other group first so the wildcard cutline is known
+    if(md===2){ for(let g=1;g<tour.groups.length;g++) tour.groups[g].mds[2].forEach(simGroupMatch); }
+    const opp2=pm.a===me?pm.b:pm.a;
+    const final=md===2;
+    const scen=final?scenarioLines():null;
+    const scenHTML=scen?`<div class="scenario${scen.curRank>=2?' danger':''}">
+      <div class="sc-h">경우의 수 · 현재 ${scen.curRank+1}위</div>
+      ${scen.lines.map(l=>`<div class="sc-l">${l}</div>`).join('')}
+    </div>`:'';
+    overlay.innerHTML=`<div class="overlay-inner">
+      <h1 style="font-size:clamp(30px,9vw,48px)">조별리그</h1>
+      <div class="champ" style="font-size:14px;color:var(--ink)">${final?'최종전':'MATCHDAY '+(md+1)} / 3 · 다음 상대 ${opp2.f} ${opp2.n} <span style="opacity:.6">(${opp2.r})</span></div>
+      ${scenHTML}
+      ${groupsHTML(false)}
+      <button class="btn" id="nextBtn">경기 시작 ▶</button>
+      <button class="btn" style="background:transparent;box-shadow:none;border:1px solid var(--line)" id="quitBtn">팀 다시 고르기</button>
+    </div>`;
+    $('nextBtn').addEventListener('click',playNextMatch);
+    $('quitBtn').addEventListener('click',()=>location.reload());
+  }
+  function showGroupResult(kind,champ){
+    overlay.classList.remove('hidden');
+    let head,sub,btn;
+    if(kind==='passed'){
+      const rank=standings(tour.groups[0]).findIndex(r=>r.team===me);
+      const pos=rank===0?'조 1위':rank===1?'조 2위':'조 3위 · 와일드카드';
+      head='조별리그 통과';
+      sub=`${me.f} ${me.n} — ${pos}로 32강 진출!`;
+      btn=`<button class="btn" id="toKoBtn">32강 대진 확인 ▶</button>`;
+    } else {
+      head='조별리그 탈락';
+      sub=`아쉽게 조별리그에서 마칩니다. 최종 우승 ${champ.f} ${champ.n}`;
+      btn=`<button class="btn" id="restartBtn">새 대회</button>`;
+    }
+    overlay.innerHTML=`<div class="overlay-inner">
+      <h1 style="font-size:clamp(30px,9vw,48px)">${head}</h1>
+      <div class="champ" style="font-size:15px;color:var(--ink)">${sub}</div>
+      ${groupsHTML(true)}
+      ${btn}
+      <button class="btn" style="background:transparent;box-shadow:none;border:1px solid var(--line)" id="quitBtn">팀 다시 고르기</button>
+    </div>`;
+    const t=$('toKoBtn'); if(t) t.addEventListener('click',()=>showBracket('advance'));
+    const r=$('restartBtn'); if(r) r.addEventListener('click',()=>{seedWorldCup();showGroupStage();});
+    $('quitBtn').addEventListener('click',()=>location.reload());
+  }
+  function teamRow(team,played,score,isWinner){
+    const isMe=team===me;
+    const cls=['team']; if(isMe)cls.push('meRow');
+    if(played){ cls.push(isWinner?'win':'out'); }
+    const s=played?`<span class="ts">${score}</span>`:`<span class="ts"></span>`;
+    return `<div class="${cls.join(' ')}"><span class="tf">${team.f}</span><span class="tn">${team.n}</span>${s}</div>`;
+  }
+  function renderBracketHTML(){
+    let h='<div class="bracket">';
+    tour.rounds.forEach((rd)=>{
+      const teamsInRound=rd.length*2;
+      h+=`<div class="brd-round"><div class="rl">${ROUND_NAMES[teamsInRound]||(teamsInRound+'강')}</div>`;
+      rd.forEach(m=>{
+        const isMine=(m.a===me||m.b===me);
+        const played=m.played;
+        const aWin=played&&m.winner===m.a, bWin=played&&m.winner===m.b;
+        const scoreA=played?m.score[0]:'';
+        const scoreB=played?m.score[1]:'';
+        h+=`<div class="match${isMine?' mine':''}">
+          ${teamRow(m.a,played,scoreA,aWin)}
+          ${teamRow(m.b,played,scoreB,bWin)}
+          ${(isMine&&!played)?'<span class="nextTag">▶ 내 경기</span>':''}
+        </div>`;
+      });
+      h+='</div>';
+    });
+    return h+'</div>';
+  }
+  function showBracket(kind,champ){
+    overlay.classList.remove('hidden');
+    let head='', sub='', btns='';
+    if(kind==='advance'){
+      const opp2=playerNextOpp();
+      const teamsInRound=tour.rounds[tour.ri].length*2;
+      const stageName=ROUND_NAMES[teamsInRound]||(teamsInRound+'강');
+      head=stageName;
+      sub=`다음 상대: ${opp2.f} ${opp2.n} <span style="opacity:.6">(${opp2.r})</span>`;
+      btns=`<button class="btn" id="nextBtn">${stageName} 시작 ▶</button>`;
+    } else if(kind==='champion'){
+      head='🏆 우승';
+      sub=`${me.f} ${me.n} 대표팀이 정상에 올랐습니다!`;
+      btns=`<button class="btn" id="restartBtn">새 대회</button>`;
+    } else { // eliminated
+      head='탈락';
+      sub=`아쉽게 여기서 마칩니다. 최종 우승 ${champ.f} ${champ.n}`;
+      btns=`<button class="btn" id="restartBtn">새 대회</button>`;
+    }
+    overlay.innerHTML=`<div class="overlay-inner">
+      <h1 style="font-size:clamp(34px,10vw,52px)">${head}</h1>
+      <div class="champ" style="font-size:16px;color:var(--ink)">${sub}</div>
+      ${renderBracketHTML()}
+      ${btns}
+      <button class="btn" style="background:transparent;box-shadow:none;border:1px solid var(--line)" id="quitBtn">팀 다시 고르기</button>
+    </div>`;
+    const nb=$('nextBtn'); if(nb) nb.addEventListener('click',playNextMatch);
+    const rb=$('restartBtn'); if(rb) rb.addEventListener('click',()=>{
+      if(mode==='worldcup'){ seedWorldCup(); showGroupStage(); }
+      else { seedTournament(); showBracket('advance'); }
+    });
+    $('quitBtn').addEventListener('click',()=>location.reload());
+  }
+  function playNextMatch(){
+    const isGroup = tour.stage==='group';
+    if(isGroup){ const m=tour.groups[0].mds[tour.groupRound][0]; opp=m.a===me?m.b:m.a; }
+    else { opp=playerNextOpp(); }
+    overlay.classList.add('hidden');
+    reset(); state.groupMatch=isGroup; beginShoot();
+  }
+
+  // ---- input ----
+  function handleZone(z){if(state.over||state.busy)return;
+    if(state.phase==='shoot')doShoot(z);else doKeep(z);}
+  zones.addEventListener('click',e=>{const z=e.target.closest('.zone');if(z)handleZone(+z.dataset.zone);});
+  zones.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){const z=e.target.closest('.zone');
+    if(z){e.preventDefault();handleZone(+z.dataset.zone);}}});
+  document.addEventListener('keydown',e=>{if(e.code==='Space'&&powerCb){e.preventDefault();lockPower();}});
+
+  startBtn.addEventListener('click',()=>{
+    if(!me)return;
+    if(mode==='tournament'){ seedTournament(); showBracket('advance'); }
+    else if(mode==='worldcup'){ seedWorldCup(); showGroupStage(); }
+    else { overlay.classList.add('hidden'); reset(); beginShoot(); }
+  });
+
+  buildGrid();
+})();
+</script>
+</body>
+</html>
