@@ -615,6 +615,14 @@
     celebrateCaptain(false);
     popText('GOAL!');
   }
+  function cpuGoalCelebrate(){
+    const r=field.getBoundingClientRect();
+    const cx=r.left+r.width/2, cy=r.top+r.height*0.32;
+    const cols=[opp?opp.kit:'#2f7fff','#ffffff','#8fb8ac'];
+    burst(34,cx,cy,cols,9);
+    celebrateCaptain(false);
+    popText('GOAL!',true);
+  }
   function playFinish(win,draw){
     if(win){
       setKickerKit(me.kit);
@@ -791,7 +799,8 @@
     setTimeout(()=>{aimAt(zone);animateBall(zone,res,dive);},120);
     setTimeout(()=>{
       if(res==='goal'){state.cpu++;state.cpuShots.push('goal');
-        say('<span class="bad">실점</span> 반대쪽으로 갔습니다','방향이 엇갈렸어요.');}
+        cpuGoalCelebrate();
+        say('<span class="bad">실점</span> 반대쪽으로 갔습니다','상대가 세리머니를 펼칩니다.');}
       else if(res==='save'){state.cpuShots.push('miss');
         popText('SAVE!');
         say('<span class="cool">선방!</span> 방향을 정확히 읽었습니다','멋진 예측이었어요.');}
